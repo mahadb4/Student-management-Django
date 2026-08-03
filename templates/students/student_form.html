@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Add Student</title>
+
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'students/style.css' %}">
+</head>
+
+<body>
+
+<div class="container">
+
+    <h1>Add Student</h1>
+
+    <form method="POST">
+
+        {% csrf_token %}
+
+        <div class="form-group">
+            <label for="first_name">First Name</label>
+            <input 
+                type="text" 
+                id="first_name"
+                name="first_name"
+                required>
+        </div>
+
+
+        <div class="form-group">
+            <label for="last_name">Last Name</label>
+            <input 
+                type="text" 
+                id="last_name"
+                name="last_name"
+                required>
+        </div>
+
+
+        <div class="form-group">
+            <label for="student_email">Email</label>
+            <input 
+                type="email" 
+                id="student_email"
+                name="student_email"
+                required>
+        </div>
+
+
+        <div class="form-group">
+            <label for="parents_phone_number">
+                Parents Phone Number
+            </label>
+
+            <input 
+                type="text"
+                id="parents_phone_number"
+                name="parents_phone_number"
+                required>
+        </div>
+
+
+        <div class="form-group">
+            <label for="date_of_birth">
+                Date of Birth
+            </label>
+
+            <input 
+                type="date"
+                id="date_of_birth"
+                name="date_of_birth"
+                required>
+        </div>
+
+
+        <div class="form-group">
+            <label for="gender">
+                Gender
+            </label>
+
+            <select name="gender" id="gender">
+
+                <option value="">
+                    Select Gender
+                </option>
+
+                <option value="M">
+                    Male
+                </option>
+
+                <option value="F">
+                    Female
+                </option>
+
+            </select>
+        </div>
+
+
+        <div class="form-group">
+            <label for="address">
+                Address
+            </label>
+
+            <textarea 
+                id="address"
+                name="address"
+                rows="4"></textarea>
+        </div>
+
+
+        <div class="form-group">
+            <label for="student_group">
+                Student Group
+            </label>
+
+            <input 
+                type="text"
+                id="student_group"
+                name="student_group"
+                required>
+        </div>
+
+
+        <div class="form-group checkbox">
+
+            <label>
+                <input 
+                    type="checkbox"
+                    name="is_active"
+                    checked>
+
+                Active Student
+
+            </label>
+
+        </div>
+
+
+        <button type="submit">
+            Save Student
+        </button>
+
+
+    </form>
+
+</div>
+
+
+</body>
+
+</html>
