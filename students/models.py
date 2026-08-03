@@ -28,3 +28,12 @@ class Student(models.Model):
 
     def __str__(self):
         return f"{self.first_name} {self.last_name}"
+
+
+    teacher = models.ForeignKey(
+    "teachers.Teacher",
+    on_delete=models.CASCADE,
+    related_name="students",
+    null=True,
+    blank=True,
+)  

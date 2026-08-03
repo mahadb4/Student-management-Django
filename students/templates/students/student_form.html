@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+
+    <title>Student Form</title>
+
+</head>
+
+<body>
+
+    <h1>
+
+        {% if student %}
+            Update Student
+        {% else %}
+            Create Student
+        {% endif %}
+
+    </h1>
+
+    {% if error %}
+
+        <p style="color:red">
+
+            {{ error }}
+
+        </p>
+
+    {% endif %}
+
+    <form method="POST">
+
+        {% csrf_token %}
+
+        <label>First Name</label>
+
+        <input
+            type="text"
+            name="first_name"
+            value="{{ student.first_name|default:'' }}"
+            required
+        >
+
+        <br><br>
+
+        <label>Last Name</label>
+
+        <input
+            type="text"
+            name="last_name"
+            value="{{ student.last_name|default:'' }}"
+            required
+        >
+
+        <br><br>
+
+        <label>Email</label>
+
+        <input
+            type="email"
+            name="student_email"
+            value="{{ student.student_email|default:'' }}"
+            required
+        >
+
+        <br><br>
+
+        <label>Parents Phone</label>
+
+        <input
+            type="text"
+            name="parents_phone_number"
+            value="{{ student.parents_phone_number|default:'' }}"
+            required
+        >
+
+        <br><br>
+
+        <label>Date of Birth</label>
+
+        <input
+            type="date"
+            name="date_of_birth"
+            value="{{ student.date_of_birth|date:'Y-m-d' }}"
+            required
+        >
+
+        <br><br>
+
+        <label>Gender</label>
+
+        <select
+            name="gender"
+            required
+        >
+
+            <option value="">Select</option>
+
+            <option
+                value="M"
+                {% if student.gender == "M" %}
+                    selected
+                {% endif %}
+            >
+                Male
+            </option>
+
+            <option
+                value="F"
+                {% if student.gender == "F" %}
+                    selected
+                {% endif %}
+            >
+                Female
+            </option>
+
+        </select>
+
+        <br><br>
+
+        <label>Address</label>
+
+        <textarea
+            name="address"
+        >{{ student.address|default:'' }}</textarea>
+
+        <br><br>
+
+        <label>Student Group</label>
+
+        <input
+            type="text"
+            name="student_group"
+            value="{{ student.student_group|default:'' }}"
+            required
+        >
+
+        <br><br>
+
+        <label>
+
+            <input
+                type="checkbox"
+                name="is_active"
+                {% if student.is_active %}
+                    checked
+                {% endif %}
+            >
+
+            Active
+
+        </label>
+
+        <br><br>
+
+        <button type="submit">
+
+            {% if student %}
+                Update Student
+            {% else %}
+                Create Student
+            {% endif %}
+
+        </button>
+
+    </form>
+
+    <br>
+
+    <a href="{% url 'student_list' %}">
+
+        Back to Student List
+
+    </a>
+
+</body>
+
+</html>
