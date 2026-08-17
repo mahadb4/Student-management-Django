@@ -1,0 +1,54 @@
+{% load static %}
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Delete Teacher</title>
+    <link rel="stylesheet" href="{% static 'css/tailwind.min.css' %}">
+    <link rel="stylesheet" href="{% static 'css/custom.css' %}">
+</head>
+
+<body class="bg-gray-50 text-gray-800">
+
+<div class="max-w-lg mx-auto py-16 px-4">
+
+    <div class="bg-white shadow rounded-lg p-6">
+
+        <h1 class="text-2xl font-bold text-gray-900">
+            Delete Teacher
+        </h1>
+
+        <p class="mt-4 text-gray-600">
+            Are you sure you want to delete
+            <strong>{{ teacher.first_name }} {{ teacher.last_name }}</strong>?
+        </p>
+
+        <form method="POST" class="mt-6 flex justify-end gap-3">
+
+            {% csrf_token %}
+
+            <a
+                href="{% url 'teacher_list' %}"
+                class="px-4 py-2 border border-gray-300 rounded-md"
+            >
+                Cancel
+            </a>
+
+            <button
+                type="submit"
+                class="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700"
+            >
+                Delete
+            </button>
+
+        </form>
+
+    </div>
+
+</div>
+
+</body>
+</html>
+

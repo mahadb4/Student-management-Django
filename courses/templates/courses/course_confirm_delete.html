@@ -1,0 +1,62 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Delete Course</title>
+    <link rel="stylesheet" href="{% static 'css/tailwind.min.css' %}">
+    <link rel="stylesheet" href="{% static 'css/custom.css' %}">
+</head>
+
+<body class="bg-gray-50 text-gray-800 font-sans antialiased">
+
+<div class="max-w-2xl mx-auto py-12 px-4">
+
+    <div class="bg-white shadow rounded-lg p-6">
+
+        <h1 class="text-2xl font-bold text-gray-900 mb-4">
+            Delete Course
+        </h1>
+
+        <p class="text-gray-600 mb-6">
+            Are you sure you want to delete
+            <strong>{{ course.code }} - {{ course.name }}</strong>?
+        </p>
+
+        <div class="bg-red-50 border border-red-200 rounded-md p-4 mb-6">
+
+            <p class="text-sm text-red-700">
+                This action cannot be undone.
+            </p>
+
+        </div>
+
+        <form method="POST">
+
+            {% csrf_token %}
+
+            <div class="flex justify-between">
+
+                <a href="{% url 'course_detail' course.id %}"
+                   class="px-4 py-2 rounded-md bg-gray-200 text-gray-700 hover:bg-gray-300">
+                    Cancel
+                </a>
+
+                <button
+                    type="submit"
+                    class="px-4 py-2 rounded-md text-white bg-red-600 hover:bg-red-700"
+                >
+                    Yes, Delete Course
+                </button>
+
+            </div>
+
+        </form>
+
+    </div>
+
+</div>
+
+</body>
+</html>

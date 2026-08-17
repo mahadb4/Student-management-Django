@@ -1,0 +1,147 @@
+{% load static %}
+
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Course Offering Details</title>
+
+    <link rel="stylesheet" href="{% static 'css/tailwind.min.css' %}">
+    <link rel="stylesheet" href="{% static 'css/custom.css' %}">
+</head>
+
+<body class="bg-gray-50 text-gray-800 font-sans antialiased">
+
+<div class="max-w-3xl mx-auto py-8 px-4">
+
+    <div class="bg-white shadow rounded-lg p-6">
+
+        <div class="flex justify-between items-center mb-6">
+
+            <h1 class="text-3xl font-bold text-gray-900">
+                Course Offering Details
+            </h1>
+
+            <span
+                class="px-3 py-1 text-sm rounded-full
+                {% if offering.is_active %}
+                    bg-green-100 text-green-700
+                {% else %}
+                    bg-red-100 text-red-700
+                {% endif %}"
+            >
+                {% if offering.is_active %}
+                    Active
+                {% else %}
+                    Inactive
+                {% endif %}
+            </span>
+
+        </div>
+
+        <div class="space-y-5">
+
+            <div>
+                <p class="text-sm text-gray-500">
+                    Course
+                </p>
+
+                <p class="text-lg font-medium text-gray-900">
+                    {{ offering.course.code }} - {{ offering.course.name }}
+                </p>
+            </div>
+
+            <div>
+                <p class="text-sm text-gray-500">
+                    Teacher
+                </p>
+
+                <p class="text-lg font-medium text-gray-900">
+                    {{ offering.teacher.first_name }}
+                    {{ offering.teacher.last_name }}
+                </p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+
+                <div>
+                    <p class="text-sm text-gray-500">
+                        Semester
+                    </p>
+
+                    <p class="font-medium">
+                        {{ offering.get_semester_display }}
+                    </p>
+                </div>
+
+                <div>
+                    <p class="text-sm text-gray-500">
+                        Academic Year
+                    </p>
+
+                    <p class="font-medium">
+                        {{ offering.academic_year }}
+                    </p>
+                </div>
+
+                <div>
+                    <p class="text-sm text-gray-500">
+                        Section
+                    </p>
+
+                    <p class="font-medium">
+                        {{ offering.section }}
+                    </p>
+                </div>
+
+            </div>
+
+            <div>
+                <p class="text-sm text-gray-500">
+                    Created
+                </p>
+
+                <p class="font-medium">
+                    {{ offering.created_at }}
+                </p>
+            </div>
+
+            <div>
+                <p class="text-sm text-gray-500">
+                    Last Updated
+                </p>
+
+                <p class="font-medium">
+                    {{ offering.updated_at }}
+                </p>
+            </div>
+
+        </div>
+
+        <div class="flex justify-between mt-8">
+
+            <a
+                href="{% url 'course_offering_list' %}"
+                class="px-4 py-2 rounded-md bg-gray-200 text-gray-700 hover:bg-gray-300"
+            >
+                Back
+            </a>
+
+            <a
+                href="{% url 'course_offering_update' offering.id %}"
+                class="px-4 py-2 rounded-md text-white bg-indigo-600 hover:bg-indigo-700"
+            >
+                Edit
+            </a>
+
+        </div>
+
+    </div>
+
+</div>
+
+</body>
+</html>

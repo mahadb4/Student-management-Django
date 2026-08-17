@@ -1,0 +1,306 @@
+{% load static %}
+
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>
+        {% if teacher %}Update Teacher{% else %}Add Teacher{% endif %}
+    </title>
+
+    <link rel="stylesheet" href="{% static 'css/tailwind.min.css' %}">
+    <link rel="stylesheet" href="{% static 'css/custom.css' %}">
+</head>
+
+<body class="bg-gray-50 text-gray-800 font-sans antialiased">
+
+<div class="max-w-4xl mx-auto py-8 px-4">
+
+    <div class="flex justify-between items-center mb-6">
+
+        <h1 class="text-3xl font-bold text-gray-900">
+            {% if teacher %}Update Teacher{% else %}Add Teacher{% endif %}
+        </h1>
+
+        <a href="{% url 'teacher_list' %}"
+           class="px-4 py-2 rounded-md bg-gray-200 hover:bg-gray-300">
+            Back
+        </a>
+
+    </div>
+
+    {% if error %}
+        <div class="mb-6 p-4 rounded-md bg-red-50 text-red-700 border border-red-200">
+            {{ error }}
+        </div>
+    {% endif %}
+
+    <form method="POST" class="bg-white shadow rounded-lg p-6">
+
+        {% csrf_token %}
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+            <div>
+                <label class="block mb-2 font-medium">
+                    First Name
+                </label>
+
+                <input
+                    type="text"
+                    name="first_name"
+                    value="{{ teacher.first_name|default:'' }}"
+                    required
+                    class="w-full border rounded-md px-3 py-2"
+                >
+            </div>
+
+            <div>
+                <label class="block mb-2 font-medium">
+                    Last Name
+                </label>
+
+                <input
+                    type="text"
+                    name="last_name"
+                    value="{{ teacher.last_name|default:'' }}"
+                    required
+                    class="w-full border rounded-md px-3 py-2"
+                >
+            </div>
+
+            <div>
+                <label class="block mb-2 font-medium">
+                    Employee ID
+                </label>
+
+                <input
+                    type="text"
+                    name="employee_id"
+                    value="{{ teacher.employee_id|default:'' }}"
+                    required
+                    class="w-full border rounded-md px-3 py-2"
+                >
+            </div>
+
+            <div>
+                <label class="block mb-2 font-medium">
+                    Email
+                </label>
+
+                <input
+                    type="email"
+                    name="email"
+                    value="{{ teacher.email|default:'' }}"
+                    required
+                    class="w-full border rounded-md px-3 py-2"
+                >
+            </div>
+
+            <div>
+                <label class="block mb-2 font-medium">
+                    Phone Number
+                </label>
+
+                <input
+                    type="text"
+                    name="phone_number"
+                    value="{{ teacher.phone_number|default:'' }}"
+                    required
+                    class="w-full border rounded-md px-3 py-2"
+                >
+            </div>
+
+            <div>
+                <label class="block mb-2 font-medium">
+                    Department
+                </label>
+
+                <select
+                    name="department"
+                    required
+                    class="w-full border rounded-md px-3 py-2"
+                >
+
+                    <option value="">
+                        Select Department
+                    </option>
+
+                    {% for department in departments %}
+
+                        <option
+                            value="{{ department.id }}"
+                            {% if teacher.department_id == department.id %}
+                                selected
+                            {% endif %}
+                        >
+                            {{ department.name }} ({{ department.code }})
+                        </option>
+
+                    {% endfor %}
+
+                </select>
+            </div>
+
+            <div>
+                <label class="block mb-2 font-medium">
+                    Designation
+                </label>
+
+                <input
+                    type="text"
+                    name="designation"
+                    value="{{ teacher.designation|default:'' }}"
+                    required
+                    class="w-full border rounded-md px-3 py-2"
+                >
+            </div>
+
+            <div>
+                <label class="block mb-2 font-medium">
+                    Qualification
+                </label>
+
+                <input
+                    type="text"
+                    name="qualification"
+                    value="{{ teacher.qualification|default:'' }}"
+                    required
+                    class="w-full border rounded-md px-3 py-2"
+                >
+            </div>
+
+            <div>
+                <label class="block mb-2 font-medium">
+                    Gender
+                </label>
+
+                <select
+                    name="gender"
+                    required
+                    class="w-full border rounded-md px-3 py-2"
+                >
+
+                    <option value="">
+                        Select Gender
+                    </option>
+
+                    <option value="M"
+                        {% if teacher.gender == "M" %}selected{% endif %}>
+                        Male
+                    </option>
+
+                    <option value="F"
+                        {% if teacher.gender == "F" %}selected{% endif %}>
+                        Female
+                    </option>
+
+                </select>
+            </div>
+
+            <div>
+                <label class="block mb-2 font-medium">
+                    Date of Birth
+                </label>
+
+                <input
+                    type="date"
+                    name="date_of_birth"
+                    value="{{ teacher.date_of_birth|date:'Y-m-d' }}"
+                    required
+                    class="w-full border rounded-md px-3 py-2"
+                >
+            </div>
+
+            <div>
+                <label class="block mb-2 font-medium">
+                    Date of Joining
+                </label>
+
+                <input
+                    type="date"
+                    name="date_of_joining"
+                    value="{{ teacher.date_of_joining|date:'Y-m-d' }}"
+                    required
+                    class="w-full border rounded-md px-3 py-2"
+                >
+            </div>
+
+            <div>
+                <label class="block mb-2 font-medium">
+                    Salary
+                </label>
+
+                <input
+                    type="number"
+                    name="salary"
+                    step="0.01"
+                    value="{{ teacher.salary|default:'' }}"
+                    required
+                    class="w-full border rounded-md px-3 py-2"
+                >
+            </div>
+
+            <div class="md:col-span-2">
+
+                <label class="block mb-2 font-medium">
+                    Address
+                </label>
+
+                <textarea
+                    name="address"
+                    rows="4"
+                    class="w-full border rounded-md px-3 py-2"
+                >{{ teacher.address|default:'' }}</textarea>
+
+            </div>
+
+            <div class="md:col-span-2">
+
+                <label class="flex items-center gap-2">
+
+                    <input
+                        type="checkbox"
+                        name="is_active"
+                        {% if not teacher or teacher.is_active %}checked{% endif %}
+                    >
+
+                    <span>Active</span>
+
+                </label>
+
+            </div>
+
+        </div>
+
+        <div class="mt-6 flex gap-3">
+
+            <button
+                type="submit"
+                class="px-4 py-2 rounded-md text-white bg-indigo-600 hover:bg-indigo-700"
+            >
+                {% if teacher %}
+                    Update Teacher
+                {% else %}
+                    Create Teacher
+                {% endif %}
+            </button>
+
+            <a
+                href="{% url 'teacher_list' %}"
+                class="px-4 py-2 rounded-md bg-gray-200 hover:bg-gray-300"
+            >
+                Cancel
+            </a>
+
+        </div>
+
+    </form>
+
+</div>
+
+</body>
+</html>

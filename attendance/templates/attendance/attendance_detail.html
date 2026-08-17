@@ -1,0 +1,104 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Attendance Details</title>
+
+    <link rel="stylesheet" href="{% static 'css/tailwind.min.css' %}">
+    <link rel="stylesheet" href="{% static 'css/custom.css' %}">
+
+</head>
+
+<body class="bg-gray-50 text-gray-800 font-sans antialiased">
+
+<div class="max-w-3xl mx-auto py-8 px-4">
+
+    <div class="bg-white shadow rounded-lg p-6">
+
+        <h1 class="text-3xl font-bold text-gray-900 mb-6">
+            Attendance Details
+        </h1>
+
+        <div class="space-y-4">
+
+            <div>
+                <p class="text-sm text-gray-500">
+                    Student
+                </p>
+
+                <p class="text-lg font-medium">
+                    {{ attendance.student }}
+                </p>
+            </div>
+
+            <div>
+                <p class="text-sm text-gray-500">
+                    Course
+                </p>
+
+                <p class="text-lg font-medium">
+                    {{ attendance.course }}
+                </p>
+            </div>
+
+            <div>
+                <p class="text-sm text-gray-500">
+                    Date
+                </p>
+
+                <p class="text-lg font-medium">
+                    {{ attendance.date }}
+                </p>
+            </div>
+
+            <div>
+                <p class="text-sm text-gray-500">
+                    Status
+                </p>
+
+                <p class="text-lg font-medium">
+                    {{ attendance.get_status_display }}
+                </p>
+            </div>
+
+            <div>
+                <p class="text-sm text-gray-500">
+                    Remarks
+                </p>
+
+                <p class="text-lg font-medium">
+                    {{ attendance.remarks|default:"No remarks." }}
+                </p>
+            </div>
+
+        </div>
+
+        <div class="flex justify-between mt-8">
+
+            <a
+                href="{% url 'attendance_list' %}"
+                class="px-4 py-2 rounded-md bg-gray-200 text-gray-700 hover:bg-gray-300"
+            >
+                Back
+            </a>
+
+            <a
+                href="{% url 'attendance_update' attendance.id %}"
+                class="px-4 py-2 rounded-md text-white bg-indigo-600 hover:bg-indigo-700"
+            >
+                Edit
+            </a>
+
+        </div>
+
+    </div>
+
+</div>
+
+</body>
+</html>

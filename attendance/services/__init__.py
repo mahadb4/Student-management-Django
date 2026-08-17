@@ -1,0 +1,1 @@
+# attendance/services package initialization
