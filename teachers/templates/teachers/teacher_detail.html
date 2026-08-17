@@ -1,0 +1,131 @@
+{% load static %}
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teacher Details</title>
+    <link rel="stylesheet" href="{% static 'css/tailwind.min.css' %}">
+    <link rel="stylesheet" href="{% static 'css/custom.css' %}">
+</head>
+
+<body class="bg-gray-50 text-gray-800">
+
+<div class="max-w-4xl mx-auto py-10 px-4">
+
+    <div class="bg-white shadow rounded-lg overflow-hidden">
+
+        <div class="px-6 py-5 border-b border-gray-200">
+            <h1 class="text-2xl font-bold">
+                {{ teacher.first_name }} {{ teacher.last_name }}
+            </h1>
+
+            <p class="text-sm text-gray-500">
+                Teacher Details
+            </p>
+        </div>
+
+        <div class="px-6 py-6">
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+
+                <div>
+                    <p class="text-sm text-gray-500">Employee ID</p>
+                    <p class="font-medium">{{ teacher.employee_id }}</p>
+                </div>
+
+                <div>
+                    <p class="text-sm text-gray-500">Email</p>
+                    <p class="font-medium">{{ teacher.email }}</p>
+                </div>
+
+                <div>
+                    <p class="text-sm text-gray-500">Phone</p>
+                    <p class="font-medium">{{ teacher.phone_number }}</p>
+                </div>
+
+                <div>
+                    <p class="text-sm text-gray-500">Department</p>
+                    <p class="font-medium">{{ teacher.department.name }}</p>
+                </div>
+
+                <div>
+                    <p class="text-sm text-gray-500">Designation</p>
+                    <p class="font-medium">{{ teacher.designation }}</p>
+                </div>
+
+                <div>
+                    <p class="text-sm text-gray-500">Qualification</p>
+                    <p class="font-medium">{{ teacher.qualification }}</p>
+                </div>
+
+                <div>
+                    <p class="text-sm text-gray-500">Gender</p>
+                    <p class="font-medium">{{ teacher.gender }}</p>
+                </div>
+
+                <div>
+                    <p class="text-sm text-gray-500">Date of Birth</p>
+                    <p class="font-medium">{{ teacher.date_of_birth }}</p>
+                </div>
+
+                <div>
+                    <p class="text-sm text-gray-500">Date of Joining</p>
+                    <p class="font-medium">{{ teacher.date_of_joining }}</p>
+                </div>
+
+                <div>
+                    <p class="text-sm text-gray-500">Salary</p>
+                    <p class="font-medium">{{ teacher.salary }}</p>
+                </div>
+
+                <div class="sm:col-span-2">
+                    <p class="text-sm text-gray-500">Address</p>
+                    <p class="font-medium">{{ teacher.address|default:"Not provided" }}</p>
+                </div>
+
+                <div>
+                    <p class="text-sm text-gray-500">Status</p>
+
+                    {% if teacher.is_active %}
+                        <span class="px-2 py-1 text-xs rounded-full bg-green-100 text-green-800">
+                            Active
+                        </span>
+                    {% else %}
+                        <span class="px-2 py-1 text-xs rounded-full bg-red-100 text-red-800">
+                            Inactive
+                        </span>
+                    {% endif %}
+
+                </div>
+
+            </div>
+
+            <div class="mt-8 pt-5 border-t border-gray-200 flex justify-end gap-3">
+
+                <a
+                    href="{% url 'teacher_list' %}"
+                    class="px-4 py-2 border border-gray-300 rounded-md"
+                >
+                    Back
+                </a>
+
+                <a
+                    href="{% url 'teacher_update' teacher.id %}"
+                    class="px-4 py-2 bg-indigo-600 text-white rounded-md"
+                >
+                    Edit
+                </a>
+
+            </div>
+
+        </div>
+
+    </div>
+
+</div>
+
+</body>
+</html>
+

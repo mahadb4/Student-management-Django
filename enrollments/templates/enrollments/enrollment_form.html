@@ -1,0 +1,223 @@
+{% load static %}
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>
+        {% if enrollment %}
+            Edit Enrollment
+        {% else %}
+            Add Enrollment
+        {% endif %}
+    </title>
+
+    <link
+        rel="stylesheet"
+        href="{% static 'css/tailwind.min.css' %}"
+    >
+
+    <link
+        rel="stylesheet"
+        href="{% static 'css/custom.css' %}"
+    >
+
+</head>
+
+<body class="bg-gray-50 text-gray-800 font-sans antialiased">
+
+<div class="max-w-3xl mx-auto py-8 px-4">
+
+    <div class="bg-white shadow rounded-lg p-6">
+
+        <h1 class="text-3xl font-bold text-gray-900 mb-6">
+
+            {% if enrollment %}
+                Edit Enrollment
+            {% else %}
+                Add Enrollment
+            {% endif %}
+
+        </h1>
+
+        {% if error %}
+
+            <div class="mb-6 p-4 rounded-md bg-red-50 text-red-700 border border-red-200">
+                {{ error }}
+            </div>
+
+        {% endif %}
+
+        <form method="POST">
+
+            {% csrf_token %}
+
+            <div class="mb-5">
+
+                <label class="block text-sm font-medium text-gray-700 mb-2">
+                    Student
+                </label>
+
+                <select
+                    name="student"
+                    class="w-full px-3 py-2 border border-gray-300 rounded-md"
+                    required
+                >
+
+                    <option value="">
+                        Select Student
+                    </option>
+
+                    {% for student in students %}
+
+                        <option
+                            value="{{ student.id }}"
+                            {% if enrollment.student_id == student.id %}
+                                selected
+                            {% endif %}
+                        >
+
+                            {{ student.first_name }}
+                            {{ student.last_name }}
+                            -
+                            {{ student.student_email }}
+
+                        </option>
+
+                    {% endfor %}
+
+                </select>
+
+            </div>
+
+            <div class="mb-5">
+
+                <label class="block text-sm font-medium text-gray-700 mb-2">
+                    Course Offering
+                </label>
+
+                <select
+                    name="course_offering"
+                    class="w-full px-3 py-2 border border-gray-300 rounded-md"
+                    required
+                >
+
+                    <option value="">
+                        Select Course Offering
+                    </option>
+
+                    {% for offering in course_offerings %}
+
+                        <option
+                            value="{{ offering.id }}"
+                            {% if enrollment.course_offering_id == offering.id %}
+                                selected
+                            {% endif %}
+                        >
+
+                            {{ offering.course.code }}
+                            -
+                            {{ offering.course.name }}
+                            |
+                            {{ offering.section }}
+                            |
+                            {{ offering.semester }}
+                            {{ offering.academic_year }}
+                            |
+                            {{ offering.teacher.first_name }}
+                            {{ offering.teacher.last_name }}
+
+                        </option>
+
+                    {% endfor %}
+
+                </select>
+
+                <p class="text-sm text-gray-500 mt-2">
+                    Select the specific course offering the student is enrolling in.
+                </p>
+
+            </div>
+
+            <div class="mb-6">
+
+                <label class="block text-sm font-medium text-gray-700 mb-2">
+                    Status
+                </label>
+
+                <select
+                    name="status"
+                    class="w-full px-3 py-2 border border-gray-300 rounded-md"
+                    required
+                >
+
+                    <option
+                        value="ACTIVE"
+                        {% if not enrollment or enrollment.status == "ACTIVE" %}
+                            selected
+                        {% endif %}
+                    >
+                        Active
+                    </option>
+
+                    <option
+                        value="DROPPED"
+                        {% if enrollment.status == "DROPPED" %}
+                            selected
+                        {% endif %}
+                    >
+                        Dropped
+                    </option>
+
+                    <option
+                        value="COMPLETED"
+                        {% if enrollment.status == "COMPLETED" %}
+                            selected
+                        {% endif %}
+                    >
+                        Completed
+                    </option>
+
+                </select>
+
+            </div>
+
+            <div class="flex justify-between">
+
+                <a
+                    href="{% url 'enrollment_list' %}"
+                    class="px-4 py-2 rounded-md bg-gray-200 text-gray-700 hover:bg-gray-300"
+                >
+                    Cancel
+                </a>
+
+                <button
+                    type="submit"
+                    class="px-4 py-2 rounded-md text-white bg-indigo-600 hover:bg-indigo-700"
+                >
+
+                    {% if enrollment %}
+                        Update Enrollment
+                    {% else %}
+                        Enroll Student
+                    {% endif %}
+
+                </button>
+
+            </div>
+
+        </form>
+
+    </div>
+
+</div>
+
+</body>
+</html>

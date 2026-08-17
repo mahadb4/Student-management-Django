@@ -1,0 +1,150 @@
+{% load static %}
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>Enrollment Details</title>
+
+    <link
+        rel="stylesheet"
+        href="{% static 'css/tailwind.min.css' %}"
+    >
+
+    <link
+        rel="stylesheet"
+        href="{% static 'css/custom.css' %}"
+    >
+
+</head>
+
+<body class="bg-gray-50 text-gray-800 font-sans antialiased">
+
+<div class="max-w-3xl mx-auto py-8 px-4">
+
+    <div class="bg-white shadow rounded-lg p-6">
+
+        <h1 class="text-3xl font-bold text-gray-900 mb-6">
+            Enrollment Details
+        </h1>
+
+        <div class="space-y-4">
+
+            <div>
+                <p class="text-sm text-gray-500">
+                    Student
+                </p>
+
+                <p class="text-lg font-medium">
+                    {{ enrollment.student.first_name }}
+                    {{ enrollment.student.last_name }}
+                </p>
+            </div>
+
+            <div>
+                <p class="text-sm text-gray-500">
+                    Email
+                </p>
+
+                <p class="text-lg">
+                    {{ enrollment.student.student_email }}
+                </p>
+            </div>
+
+            <div>
+                <p class="text-sm text-gray-500">
+                    Course
+                </p>
+
+                <p class="text-lg">
+                    {{ enrollment.course_offering.course.code }}
+                    -
+                    {{ enrollment.course_offering.course.name }}
+                </p>
+            </div>
+
+            <div>
+                <p class="text-sm text-gray-500">
+                    Teacher
+                </p>
+
+                <p class="text-lg">
+                    {{ enrollment.course_offering.teacher.first_name }}
+                    {{ enrollment.course_offering.teacher.last_name }}
+                </p>
+            </div>
+
+            <div>
+                <p class="text-sm text-gray-500">
+                    Semester
+                </p>
+
+                <p class="text-lg">
+                    {{ enrollment.course_offering.semester }}
+                    {{ enrollment.course_offering.academic_year }}
+                </p>
+            </div>
+
+            <div>
+                <p class="text-sm text-gray-500">
+                    Section
+                </p>
+
+                <p class="text-lg">
+                    {{ enrollment.course_offering.section }}
+                </p>
+            </div>
+
+            <div>
+                <p class="text-sm text-gray-500">
+                    Status
+                </p>
+
+                <p class="text-lg">
+                    {{ enrollment.get_status_display }}
+                </p>
+            </div>
+
+            <div>
+                <p class="text-sm text-gray-500">
+                    Enrolled At
+                </p>
+
+                <p class="text-lg">
+                    {{ enrollment.enrolled_at }}
+                </p>
+            </div>
+
+        </div>
+
+        <div class="flex justify-between mt-8">
+
+            <a
+                href="{% url 'enrollment_list' %}"
+                class="px-4 py-2 rounded-md bg-gray-200 text-gray-700 hover:bg-gray-300"
+            >
+                Back
+            </a>
+
+            <a
+                href="{% url 'enrollment_update' enrollment.id %}"
+                class="px-4 py-2 rounded-md text-white bg-indigo-600 hover:bg-indigo-700"
+            >
+                Edit Enrollment
+            </a>
+
+        </div>
+
+    </div>
+
+</div>
+
+</body>
+</html>

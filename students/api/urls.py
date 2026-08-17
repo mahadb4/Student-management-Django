@@ -1,20 +1,7 @@
 from django.urls import path
-
-from .students import students
-from .student import student
+from .student_api import student_api
 
 urlpatterns = [
-
-    path(
-        "students/",
-        students,
-        name="api_students",
-    ),
-
-    path(
-        "students/<int:student_id>/",
-        student,
-        name="api_student",
-    ),
-
+    path("students/", student_api, name="student_api_list"),
+    path("students/<int:student_id>/", student_api, name="student_api_detail"),
 ]

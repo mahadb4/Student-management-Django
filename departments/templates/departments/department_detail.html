@@ -1,0 +1,67 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ department.name }}</title>
+    <link rel="stylesheet" href="{% static 'css/tailwind.min.css' %}">
+    <link rel="stylesheet" href="{% static 'css/custom.css' %}">
+</head>
+
+<body class="bg-gray-50 text-gray-800">
+<div class="max-w-3xl mx-auto py-10 px-4">
+
+    <div class="bg-white shadow rounded-lg p-6">
+
+        <h1 class="text-3xl font-bold mb-6">
+            {{ department.name }}
+        </h1>
+
+        <div class="space-y-4">
+
+            <p><strong>ID:</strong> {{ department.id }}</p>
+
+            <p><strong>Name:</strong> {{ department.name }}</p>
+
+            <p><strong>Code:</strong> {{ department.code }}</p>
+
+            <p>
+                <strong>Description:</strong>
+                {{ department.description|default:"No description provided." }}
+            </p>
+
+            <p>
+                <strong>Status:</strong>
+                {% if department.is_active %}
+                    <span class="text-green-600">Active</span>
+                {% else %}
+                    <span class="text-red-600">Inactive</span>
+                {% endif %}
+            </p>
+
+            <p><strong>Created:</strong> {{ department.created_at }}</p>
+            <p><strong>Updated:</strong> {{ department.updated_at }}</p>
+
+        </div>
+
+        <div class="mt-8 flex gap-3">
+
+            <a href="{% url 'department_update' department.id %}"
+               class="px-4 py-2 bg-indigo-600 text-white rounded-md">
+                Edit
+            </a>
+
+            <a href="{% url 'department_list' %}"
+               class="px-4 py-2 bg-gray-200 rounded-md">
+                Back
+            </a>
+
+        </div>
+
+    </div>
+
+</div>
+</body>
+</html>
+

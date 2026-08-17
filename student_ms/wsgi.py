@@ -1,4 +1,5 @@
 """
+
 WSGI config for student_ms project.
 
 It exposes the WSGI callable as a module-level variable named ``application``.

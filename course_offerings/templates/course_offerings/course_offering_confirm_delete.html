@@ -1,0 +1,79 @@
+{% load static %}
+
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Delete Course Offering</title>
+
+    <link rel="stylesheet" href="{% static 'css/tailwind.min.css' %}">
+    <link rel="stylesheet" href="{% static 'css/custom.css' %}">
+</head>
+
+<body class="bg-gray-50 text-gray-800 font-sans antialiased">
+
+<div class="max-w-xl mx-auto py-12 px-4">
+
+    <div class="bg-white shadow rounded-lg p-6">
+
+        <h1 class="text-2xl font-bold text-gray-900 mb-4">
+            Delete Course Offering
+        </h1>
+
+        <p class="text-gray-600 mb-6">
+            Are you sure you want to delete this course offering?
+        </p>
+
+        <div class="bg-gray-50 rounded-md p-4 mb-6">
+
+            <p class="font-medium text-gray-900">
+                {{ offering.course.code }} - {{ offering.course.name }}
+            </p>
+
+            <p class="text-gray-600">
+                Teacher:
+                {{ offering.teacher.first_name }}
+                {{ offering.teacher.last_name }}
+            </p>
+
+            <p class="text-gray-600">
+                {{ offering.get_semester_display }}
+                {{ offering.academic_year }}
+                - Section {{ offering.section }}
+            </p>
+
+        </div>
+
+        <form method="POST">
+
+            {% csrf_token %}
+
+            <div class="flex justify-between">
+
+                <a
+                    href="{% url 'course_offering_list' %}"
+                    class="px-4 py-2 rounded-md bg-gray-200 text-gray-700 hover:bg-gray-300"
+                >
+                    Cancel
+                </a>
+
+                <button
+                    type="submit"
+                    class="px-4 py-2 rounded-md text-white bg-red-600 hover:bg-red-700"
+                >
+                    Delete Course Offering
+                </button>
+
+            </div>
+
+        </form>
+
+    </div>
+
+</div>
+
+</body>
+</html>

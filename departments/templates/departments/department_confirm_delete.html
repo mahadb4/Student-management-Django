@@ -1,0 +1,45 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Delete Department</title>
+    <link rel="stylesheet" href="{% static 'css/tailwind.min.css' %}">
+    <link rel="stylesheet" href="{% static 'css/custom.css' %}">
+</head>
+
+<body class="bg-gray-50 text-gray-800">
+<div class="max-w-lg mx-auto py-16 px-4">
+
+    <div class="bg-white shadow rounded-lg p-6 text-center">
+
+        <h1 class="text-2xl font-bold text-gray-900 mb-4">
+            Delete Department?
+        </h1>
+
+        <p class="text-gray-600 mb-6">
+            Are you sure you want to delete
+            <strong>{{ department.name }}</strong>?
+        </p>
+
+        <form method="POST" class="flex justify-center gap-3">
+            {% csrf_token %}
+
+            <a href="{% url 'department_detail' department.id %}"
+               class="px-4 py-2 bg-gray-200 rounded-md">
+                Cancel
+            </a>
+
+            <button type="submit"
+                    class="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700">
+                Yes, Delete
+            </button>
+        </form>
+
+    </div>
+
+</div>
+</body>
+</html>
+
