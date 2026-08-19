@@ -3,6 +3,7 @@ from django.utils import timezone
 from departments.models import Department
 
 class Teacher(models.Model):
+    user = models.OneToOneField("users.User", on_delete=models.CASCADE, null=True, blank=True, related_name="teacher_profile")
     first_name = models.CharField(max_length=100)
     last_name = models.CharField(max_length=100)
     employee_id = models.CharField(max_length=20, unique=True)

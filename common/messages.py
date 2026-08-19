@@ -1,5 +1,4 @@
 class Messages:
-
     # ── Student ──────────────────────────────────────────────────────────────
     STUDENT_CREATED = "Student created successfully."
     STUDENT_UPDATED = "Student updated successfully."
@@ -111,3 +110,23 @@ class Messages:
 
     # ── Legacy / Generic (kept for backward compatibility) ────────────────────
     NOT_FOUND = "Object not found."
+
+    # ── User ────────────────────────────────────────────────────────────────────
+    USER_CREATED = "User created successfully."
+    USER_UPDATED = "User updated successfully."
+    USER_DELETED = "User deleted successfully."
+    USER_NOT_FOUND = "User not found."
+    USER_NOT_FOUND_BY_ID = "User with ID {} not found."
+    USER_ID_REQUIRED = "User ID is required."
+
+    USER_REGISTRATION_SUCCESSFUL = "Registration successful. Your account is pending approval."
+    USER_APPROVED_SUCCESSFULLY = "User approved successfully."
+    USER_REJECTED_SUCCESSFULLY = "User rejected successfully."
+
+    INVALID_EMAIL_OR_PASSWORD = "Invalid email or password."
+    ACCOUNT_PENDING_APPROVAL = "Your account is pending approval by an administrator."
+    REGISTRATION_REJECTED = "Your registration was rejected."
+    REFRESH_TOKEN_REQUIRED = "Refresh token is required."
+
+    PASSWORD_REQUIRED = "Password is required."
+    PASSWORD_TOO_SHORT = "Password must be at least 8 characters long."

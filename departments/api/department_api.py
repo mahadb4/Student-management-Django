@@ -1,3 +1,4 @@
+from common.decorators import enforce_permissions
 import json
 from django.db.models.deletion import ProtectedError
 from django.http import HttpResponse, JsonResponse
@@ -26,6 +27,7 @@ def serialize_department(department):
 
 
 @csrf_exempt
+@enforce_permissions('departments', 'department')
 def department_api(request, department_id = None):
     try:
         if request.method == "GET":

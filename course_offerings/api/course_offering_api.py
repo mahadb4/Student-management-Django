@@ -27,15 +27,25 @@ def serialize_course_offering(offering):
     }
 
 
+
+from common.decorators import enforce_permissions
+
 @csrf_exempt
+@enforce_permissions('course_offerings', 'courseoffering')
 def course_offering_api(request, offering_id = None):
     try:
+        from common.permissions import apply_data_scope
+        from course_offerings.models import CourseOffering
+        scoped_qs = apply_data_scope(request.user, CourseOffering.objects.all(), 'courseoffering')
+        if offering_id is not None and not scoped_qs.filter(id=offering_id).exists():
+            return JsonResponse({"error": "Forbidden"}, status=403)
+
         if request.method == "GET":
             if offering_id is not None:
                 offering = course_offering_service.get(offering_id)
                 return JsonResponse(serialize_course_offering(offering))
 
-            offerings = course_offering_service.get_all()
+            offerings = scoped_qs
             return JsonResponse([serialize_course_offering(offering) for offering in offerings], safe = False)
 
         if request.method == "POST":
