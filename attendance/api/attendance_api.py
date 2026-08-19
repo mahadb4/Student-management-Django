@@ -25,15 +25,25 @@ def serialize_attendance(attendance):
     }
 
 
+
+from common.decorators import enforce_permissions
+
 @csrf_exempt
+@enforce_permissions('attendance', 'attendance')
 def attendance_api(request, attendance_id = None):
     try:
+        from common.permissions import apply_data_scope
+        from attendance.models import Attendance
+        scoped_qs = apply_data_scope(request.user, Attendance.objects.all(), 'attendance')
+        if attendance_id is not None and not scoped_qs.filter(id=attendance_id).exists():
+            return JsonResponse({"error": "Forbidden"}, status=403)
+
         if request.method == "GET":
             if attendance_id is not None:
                 attendance = attendance_service.get(attendance_id)
                 return JsonResponse(serialize_attendance(attendance))
 
-            attendances = attendance_service.get_all()
+            attendances = scoped_qs
             return JsonResponse([serialize_attendance(attendance) for attendance in attendances], safe = False)
 
         if request.method == "POST":

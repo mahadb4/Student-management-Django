@@ -3,6 +3,7 @@ from departments.models import Department
 from teachers.models import Teacher
 
 class Student(models.Model):
+    user = models.OneToOneField("users.User", on_delete=models.CASCADE, null=True, blank=True, related_name="student_profile")
     first_name = models.CharField(max_length=100)
     last_name = models.CharField(max_length=100)
     student_email = models.EmailField(unique=True)

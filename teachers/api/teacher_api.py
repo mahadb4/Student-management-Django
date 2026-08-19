@@ -33,14 +33,24 @@ def serialize_teacher(teacher):
         "updated_at": teacher.updated_at,
     }
 
+
+from common.decorators import enforce_permissions
+
 @csrf_exempt
+@enforce_permissions('teachers', 'teacher')
 def teacher_api(request, teacher_id = None):
     try:
+        from common.permissions import apply_data_scope
+        from teachers.models import Teacher
+        scoped_qs = apply_data_scope(request.user, Teacher.objects.all(), 'teacher')
+        if teacher_id is not None and not scoped_qs.filter(id=teacher_id).exists():
+            return JsonResponse({"error": "Forbidden"}, status=403)
+
         if request.method == "GET":
             if teacher_id is not None:
                 return JsonResponse(serialize_teacher(teacher_service.get(teacher_id)))
 
-            return JsonResponse([serialize_teacher(teacher) for teacher in teacher_service.get_all()], safe = False)
+            return JsonResponse([serialize_teacher(teacher) for teacher in scoped_qs], safe = False)
 
         if request.method == "POST":
             teacher = teacher_service.create(json.loads(request.body))

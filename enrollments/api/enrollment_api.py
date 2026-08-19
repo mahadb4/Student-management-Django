@@ -24,15 +24,25 @@ def serialize_enrollment(enrollment):
     }
 
 
+
+from common.decorators import enforce_permissions
+
 @csrf_exempt
+@enforce_permissions('enrollments', 'enrollment')
 def enrollment_api(request, enrollment_id = None):
     try:
+        from common.permissions import apply_data_scope
+        from enrollments.models import Enrollment
+        scoped_qs = apply_data_scope(request.user, Enrollment.objects.all(), 'enrollment')
+        if enrollment_id is not None and not scoped_qs.filter(id=enrollment_id).exists():
+            return JsonResponse({"error": "Forbidden"}, status=403)
+
         if request.method == "GET":
             if enrollment_id is not None:
                 enrollment = enrollment_service.get(enrollment_id)
                 return JsonResponse(serialize_enrollment(enrollment))
 
-            enrollments = enrollment_service.get_all()
+            enrollments = scoped_qs
             return JsonResponse([serialize_enrollment(enrollment) for enrollment in enrollments], safe = False)
 
         if request.method == "POST":

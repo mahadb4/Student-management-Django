@@ -1,4 +1,5 @@
-﻿import json
+from common.decorators import enforce_permissions
+import json
 from django.db.models.deletion import ProtectedError
 from django.http import HttpResponse, JsonResponse
 from django.views.decorators.csrf import csrf_exempt
@@ -27,6 +28,7 @@ def serialize_course(course):
     }
 
 @csrf_exempt
+@enforce_permissions('courses', 'course')
 def course_api(request, course_id = None):
     try:
         if request.method == "GET":

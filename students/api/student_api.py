@@ -29,15 +29,25 @@ def serialize_student(student):
         "is_active": student.is_active,
     }
 
+
+from common.decorators import enforce_permissions
+
 @csrf_exempt
+@enforce_permissions('students', 'student')
 def student_api(request, student_id = None):
     try:
+        from common.permissions import apply_data_scope
+        from students.models import Student
+        scoped_qs = apply_data_scope(request.user, Student.objects.all(), 'student')
+        if student_id is not None and not scoped_qs.filter(id=student_id).exists():
+            return JsonResponse({"error": "Forbidden"}, status=403)
+
         if request.method == "GET":
             if student_id is not None:
                 student = student_service.get(student_id)
                 return JsonResponse(serialize_student(student))
 
-            students = student_service.get_all()
+            students = scoped_qs
             return JsonResponse([serialize_student(student) for student in students], safe = False)
 
         if request.method == "POST":
