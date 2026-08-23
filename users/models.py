@@ -1,11 +1,12 @@
 from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, PermissionsMixin
 from django.db import models
+from common.messages import Messages
 
 
 class UserManager(BaseUserManager):
     def create_user(self, email, name, password=None, role="student", status="pending"):
         if not email:
-            raise ValueError("Email is required.")
+            raise ValueError(Messages.EMAIL_REQUIRED)
 
         user = self.model(
             email=self.normalize_email(email),

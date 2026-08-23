@@ -12,6 +12,8 @@ student_validator = StudentValidator()
 student_repository = StudentRepository()
 student_service = StudentService(student_validator, student_repository)
 
+from common.utils import paginate_queryset
+
 def serialize_student(student):
     return {
         "id": student.id,
@@ -22,25 +24,26 @@ def serialize_student(student):
         "date_of_birth": str(student.date_of_birth),
         "gender": student.gender,
         "address": student.address,
-        "student_group": student.student_group,
         "department": student.department_id,
-        "teacher": student.teacher_id,
+        "section": student.section_id,
         "date_of_enrollment": str(student.date_of_enrollment),
         "is_active": student.is_active,
     }
 
 
 from common.decorators import enforce_permissions
+from students.mappers.student_mapper import StudentMapper
 
 @csrf_exempt
 @enforce_permissions('students', 'student')
 def student_api(request, student_id = None):
     try:
         from common.permissions import apply_data_scope
-        from students.models import Student
-        scoped_qs = apply_data_scope(request.user, Student.objects.all(), 'student')
+        # List responses use a projected, JOINed queryset (id/name fields + department/section
+        # names only) so the Students list never needs separate Department/Section round trips.
+        scoped_qs = apply_data_scope(request.user, student_repository.get_queryset_for_list(), 'student')
         if student_id is not None and not scoped_qs.filter(id=student_id).exists():
-            return JsonResponse({"error": "Forbidden"}, status=403)
+            return JsonResponse({"error": Messages.FORBIDDEN}, status=403)
 
         if request.method == "GET":
             if student_id is not None:
@@ -48,7 +51,7 @@ def student_api(request, student_id = None):
                 return JsonResponse(serialize_student(student))
 
             students = scoped_qs
-            return JsonResponse([serialize_student(student) for student in students], safe = False)
+            return paginate_queryset(request, students, StudentMapper.to_list_dto)
 
         if request.method == "POST":
             data = json.loads(request.body)
@@ -103,3 +106,19 @@ def student_api(request, student_id = None):
 
     except ValueError as e:
         return JsonResponse({"error": str(e)}, status = 400)
+
+
+def my_profile_api(request):
+    if request.method != "GET":
+        return JsonResponse({"error": Messages.METHOD_NOT_ALLOWED}, status = 405)
+
+    from common.permissions import authenticate_request
+    user, error = authenticate_request(request)
+    if error:
+        return error
+
+    student = getattr(user, "student_profile", None)
+    if not student:
+        return JsonResponse({"error": Messages.STUDENT_NOT_FOUND}, status = 404)
+
+    return JsonResponse(serialize_student(student))

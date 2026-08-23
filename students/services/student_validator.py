@@ -7,7 +7,6 @@ class StudentValidator:
         CommonValidator.validate_email(data["student_email"])
         CommonValidator.validate_phone(data["parents_phone_number"])
         self.validate_age(data["date_of_birth"])
-        self.validate_group(data["student_group"])
 
     def validate_age(self, date_of_birth):
         if isinstance(date_of_birth, str):
@@ -18,7 +17,3 @@ class StudentValidator:
 
         if age < 5:
             raise ValueError(Messages.STUDENT_AGE_MINIMUM)
-
-    def validate_group(self, group):
-        if not group or not group.strip():
-            raise ValueError(Messages.STUDENT_GROUP_REQUIRED)

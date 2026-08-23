@@ -1,4 +1,5 @@
 import json
+from django.db import transaction
 from django.http import HttpResponse, JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from rest_framework_simplejwt.authentication import JWTAuthentication
@@ -7,14 +8,45 @@ from users.models import User
 from users.repositories.user_repository import UserRepository
 from users.services.user_service import UserService
 from users.services.user_validator import UserValidator
+from students.services.student_service import StudentService
+from students.services.student_validator import StudentValidator
+from students.repositories.student_repository import StudentRepository
+from teachers.services.teacher_service import TeacherService
+from teachers.services.teacher_validator import TeacherValidator
+from teachers.repositories.teacher_repository import TeacherRepository
 
 
 user_validator = UserValidator()
 user_repository = UserRepository()
 user_service = UserService(user_validator, user_repository)
 
+student_service = StudentService(StudentValidator(), StudentRepository())
+teacher_service = TeacherService(TeacherValidator(), TeacherRepository())
+
+
+def _create_own_profile(user, profile):
+    # Onboarding profile creation: the email/role identity comes from the
+    # already-authenticated User, never from the submitted payload, so a
+    # user can only ever create and link a profile for themself.
+    if user.role == "student":
+        student = student_service.create({**profile, "student_email": user.email})
+        student.user = user
+        student.save(update_fields=["user"])
+        return student
+    if user.role == "teacher":
+        teacher = teacher_service.create({**profile, "email": user.email})
+        teacher.user = user
+        teacher.save(update_fields=["user"])
+        return teacher
+    return None
+
+from common.utils import paginate_queryset
+
 
 def serialize_user(user):
+    student = getattr(user, "student_profile", None)
+    teacher = getattr(user, "teacher_profile", None)
+
     return {
         "id": user.id,
         "name": user.name,
@@ -22,6 +54,8 @@ def serialize_user(user):
         "role": user.role,
         "status": user.status,
         "permissions": [],
+        "student_id": student.id if student else None,
+        "teacher_id": teacher.id if teacher else None,
     }
 
 
@@ -34,10 +68,7 @@ def user_api(request, user_id=None):
                 return JsonResponse(serialize_user(user))
 
             users = user_service.get_all()
-            return JsonResponse(
-                [serialize_user(user) for user in users],
-                safe=False,
-            )
+            return paginate_queryset(request, users, serialize_user)
 
         return JsonResponse(
             {"error": Messages.METHOD_NOT_ALLOWED},
@@ -134,6 +165,9 @@ def approve_user_api(request, user_id):
                 status=405,
             )
 
+        # One-click for every role: approval only grants login + Group access.
+        # Student/Teacher profile completion happens separately, by the user
+        # themself, via the onboarding flow after their first login.
         user = user_service.approve(user_id)
 
         return JsonResponse(
@@ -219,11 +253,7 @@ def pending_users_api(request):
         )
 
     users = user_service.get_pending()
-
-    return JsonResponse(
-        [serialize_user(user) for user in users],
-        safe=False,
-    )
+    return paginate_queryset(request, users, serialize_user)
 
 
 def me_api(request):
@@ -239,7 +269,7 @@ def me_api(request):
 
         if authentication_result is None:
             return JsonResponse(
-                {"error": "Authentication credentials were not provided."},
+                {"error": Messages.AUTH_CREDENTIALS_NOT_PROVIDED},
                 status=401,
             )
 
@@ -251,6 +281,70 @@ def me_api(request):
 
     except Exception:
         return JsonResponse(
-            {"error": "Invalid or expired token."},
+            {"error": Messages.INVALID_OR_EXPIRED_TOKEN},
+            status=401,
+        )
+
+
+@csrf_exempt
+def complete_onboarding_api(request):
+    try:
+        if request.method != "POST":
+            return JsonResponse(
+                {"error": Messages.METHOD_NOT_ALLOWED},
+                status=405,
+            )
+
+        authentication = JWTAuthentication()
+        authentication_result = authentication.authenticate(request)
+
+        if authentication_result is None:
+            return JsonResponse(
+                {"error": Messages.AUTH_CREDENTIALS_NOT_PROVIDED},
+                status=401,
+            )
+
+        user, _ = authentication_result
+
+        if user.role not in ("student", "teacher"):
+            return JsonResponse(
+                {"error": Messages.INVALID_REQUEST},
+                status=400,
+            )
+
+        if getattr(user, "student_profile", None) or getattr(user, "teacher_profile", None):
+            return JsonResponse(
+                {"error": Messages.INVALID_REQUEST},
+                status=400,
+            )
+
+        data = json.loads(request.body)
+
+        if not isinstance(data, dict):
+            raise ValueError(Messages.REQUEST_BODY_MUST_BE_JSON_OBJECT)
+
+        with transaction.atomic():
+            _create_own_profile(user, data)
+
+        return JsonResponse(
+            {"user": serialize_user(user)},
+            status=201,
+        )
+
+    except json.JSONDecodeError:
+        return JsonResponse(
+            {"error": Messages.INVALID_JSON},
+            status=400,
+        )
+
+    except ValueError as e:
+        return JsonResponse(
+            {"error": str(e)},
+            status=400,
+        )
+
+    except Exception:
+        return JsonResponse(
+            {"error": Messages.INVALID_OR_EXPIRED_TOKEN},
             status=401,
         )

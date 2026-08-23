@@ -6,24 +6,30 @@ class DepartmentRepository(BaseRepository):
     def __init__(self):
         super().__init__(Department)
 
-    def name_exists(self, name, exclude_id = None):
-        query = self.model.objects.filter(name__iexact = name)
+    def name_exists(self, name, exclude_id=None):
+        query=self.model.objects.filter(
+            name__iexact=name,
+            is_deleted=False,
+        )
 
         if exclude_id is not None:
-            query = query.exclude(id = exclude_id)
+            query=query.exclude(id=exclude_id)
 
         return query.exists()
 
-    def code_exists(self, code, exclude_id = None):
-        query = self.model.objects.filter(code__iexact = code)
+    def code_exists(self, code, exclude_id=None):
+        query=self.model.objects.filter(
+            code__iexact=code,
+            is_deleted=False,
+        )
 
         if exclude_id is not None:
-            query = query.exclude(id = exclude_id)
+            query=query.exclude(id=exclude_id)
 
         return query.exists()
 
     def create(self, data):
-        department = self.model()
+        department=self.model()
         self.fill(department, data)
         department.save()
         return department
@@ -34,7 +40,7 @@ class DepartmentRepository(BaseRepository):
         return department
 
     def fill(self, department, data):
-        department.name = data["name"].strip()
-        department.code = data["code"].strip()
-        department.description = (data.get("description") or "").strip()
-        department.is_active = data.get("is_active", True) in (True, "on", "true", "True")
+        department.name=data["name"].strip()
+        department.code=data["code"].strip()
+        department.description=(data.get("description") or "").strip()
+        department.is_active=data.get("is_active", True) in (True, "on", "true", "True")

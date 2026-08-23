@@ -13,6 +13,9 @@ course_validator = CourseValidator()
 course_repository = CourseRepository()
 course_service = CourseService(course_validator, course_repository)
 
+from common.utils import paginate_queryset
+from courses.mappers.course_mapper import CourseMapper
+
 def serialize_course(course):
     return {
         "id": course.id,
@@ -36,8 +39,8 @@ def course_api(request, course_id = None):
                 course = course_service.get(course_id)
                 return JsonResponse(serialize_course(course))
 
-            courses = course_service.get_all()
-            return JsonResponse([serialize_course(course) for course in courses], safe = False)
+            courses = course_repository.get_queryset_for_list()
+            return paginate_queryset(request, courses, CourseMapper.to_list_dto)
 
         if request.method == "POST":
             data = json.loads(request.body)
