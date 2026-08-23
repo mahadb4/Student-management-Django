@@ -29,8 +29,8 @@ def student_create_view(request):
             "date_of_birth": request.POST.get("date_of_birth"),
             "gender": request.POST.get("gender"),
             "address": request.POST.get("address", ""),
-            "student_group": request.POST.get("student_group"),
-            "teacher": request.POST.get("teacher") or None,
+            "department": request.POST.get("department") or None,
+            "section": request.POST.get("section") or None,
             "is_active": request.POST.get("is_active"),
         }
 
@@ -55,8 +55,8 @@ def student_update_view(request, student_id):
             "date_of_birth": request.POST.get("date_of_birth"),
             "gender": request.POST.get("gender"),
             "address": request.POST.get("address", ""),
-            "student_group": request.POST.get("student_group"),
-            "teacher": request.POST.get("teacher") or None,
+            "department": request.POST.get("department") or None,
+            "section": request.POST.get("section") or None,
             "is_active": request.POST.get("is_active"),
         }
 

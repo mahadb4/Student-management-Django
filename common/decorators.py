@@ -1,6 +1,7 @@
 from functools import wraps
 from django.http import JsonResponse
 from rest_framework_simplejwt.authentication import JWTAuthentication
+from common.messages import Messages
 
 def enforce_permissions(app_label, model_name):
     def decorator(view_func):
@@ -13,7 +14,7 @@ def enforce_permissions(app_label, model_name):
                 authentication_result = None
 
             if authentication_result is None:
-                return JsonResponse({"error": "Authentication required."}, status=401)
+                return JsonResponse({"error": Messages.AUTHENTICATION_REQUIRED}, status=401)
                 
             user, token = authentication_result
             request.user = user
@@ -30,7 +31,7 @@ def enforce_permissions(app_label, model_name):
             if action:
                 perm = f"{app_label}.{action}_{model_name}"
                 if not user.has_perm(perm):
-                    return JsonResponse({"error": f"Permission denied: {perm} required."}, status=403)
+                    return JsonResponse({"error": Messages.PERMISSION_DENIED.format(perm)}, status=403)
                     
             return view_func(request, *args, **kwargs)
         return _wrapped_view

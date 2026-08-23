@@ -8,7 +8,6 @@ class Messages:
     STUDENT_ID_REQUIRED = "Student ID is required."
     STUDENT_CANNOT_BE_DELETED = "Student with ID {} cannot be deleted because related records exist."
     STUDENT_AGE_MINIMUM = "Student age must be at least 5 years."
-    STUDENT_GROUP_REQUIRED = "Student group is required."
 
     # ── Teacher ───────────────────────────────────────────────────────────────
     TEACHER_CREATED = "Teacher created successfully."
@@ -29,6 +28,16 @@ class Messages:
     DEPARTMENT_CANNOT_BE_DELETED = "Department with ID {} cannot be deleted because related records exist."
     DEPARTMENT_NAME_EXISTS = "Department name '{}' already exists."
     DEPARTMENT_CODE_EXISTS = "Department code '{}' already exists."
+
+    # ── Section ───────────────────────────────────────────────────────────────
+    SECTION_CREATED = "Section created successfully."
+    SECTION_UPDATED = "Section updated successfully."
+    SECTION_DELETED = "Section deleted successfully."
+    SECTION_NOT_FOUND = "Section not found."
+    SECTION_NOT_FOUND_BY_ID = "Section with ID {} not found."
+    SECTION_ID_REQUIRED = "Section ID is required."
+    SECTION_CANNOT_BE_DELETED = "Section with ID {} cannot be deleted because related records exist."
+    SECTION_EXISTS = "A section with the same name, department, semester and academic year already exists."
 
     # ── Course ────────────────────────────────────────────────────────────────
     COURSE_CREATED = "Course created successfully."
@@ -73,6 +82,12 @@ class Messages:
     INVALID_REQUEST = "Invalid request."
     REQUEST_BODY_MUST_BE_JSON_OBJECT = "Request body must be a JSON object."
     REQUEST_DATA_MUST_BE_JSON_OBJECT = "Request data must be a JSON object."
+    FORBIDDEN = "Forbidden."
+    AUTHENTICATION_REQUIRED = "Authentication required."
+    AUTH_CREDENTIALS_NOT_PROVIDED = "Authentication credentials were not provided."
+    INVALID_OR_EXPIRED_TOKEN = "Invalid or expired token."
+    PERMISSION_DENIED = "Permission denied: {} required."
+    ADMIN_ACCESS_REQUIRED = "Admin access required."
 
     # ── Validation — Email ────────────────────────────────────────────────────
     EMAIL_REQUIRED = "Email is required."
@@ -104,6 +119,7 @@ class Messages:
     INVALID_STUDENT = "Invalid student with ID {}."
     INVALID_ENROLLMENT = "Invalid enrollment with ID {}."
     INVALID_SEMESTER = "Invalid semester '{}'."
+    INVALID_SECTION = "Invalid section with ID {}."
 
     # ── Validation — Uniqueness ───────────────────────────────────────────────
     EMPLOYEE_ID_EXISTS = "Employee ID '{}' already exists."
@@ -130,3 +146,19 @@ class Messages:
 
     PASSWORD_REQUIRED = "Password is required."
     PASSWORD_TOO_SHORT = "Password must be at least 8 characters long."
+
+    STUDENT_SECTION_REQUIRED = "Student is not assigned to any section."
+    STUDENT_SECTION_MISMATCH = "Student can only enroll in course offerings for their assigned section."
+
+    ENROLLMENT_SECTION_MISMATCH = "Student can only be enrolled in a course offering for their own section."
+    STUDENT_INACTIVE = "Inactive student cannot be enrolled."
+    COURSE_OFFERING_INACTIVE = "Inactive course offering cannot be used for enrollment."
+
+
+    ATTENDANCE_UPDATED = "Attendance updated successfully."
+    ATTENDANCE_DELETED = "Attendance deleted successfully."
+    ATTENDANCE_INVALID_STATUS = "Invalid attendance status. Must be one of: {}."
+    ATTENDANCE_TEACHER_NOT_FOUND = "Teacher profile not found for the current user."
+    ATTENDANCE_COURSE_OFFERING_NOT_FOUND = "Course offering not found."
+    ATTENDANCE_COURSE_OFFERING_NOT_ASSIGNED = "You are not assigned to this course offering."
+    ATTENDANCE_ENROLLMENT_NOT_FOUND = "Enrollment not found or is not active."

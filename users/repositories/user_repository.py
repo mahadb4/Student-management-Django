@@ -1,3 +1,4 @@
+from django.contrib.auth.models import Group
 from common.repositories.base_repository import BaseRepository
 from users.models import User
 
@@ -32,6 +33,13 @@ class UserRepository(BaseRepository):
     def approve(self, user):
         user.status = "approved"
         user.save()
+
+        # Role -> Group is a direct, generic mapping (ADMIN/TEACHER/STUDENT/STAFF)
+        # so every approved user actually gets the permissions enforce_permissions
+        # checks for, regardless of role - no per-role special-casing needed here.
+        group, _ = Group.objects.get_or_create(name=user.role.upper())
+        user.groups.add(group)
+
         return user
 
     def reject(self, user):

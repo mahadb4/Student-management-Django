@@ -12,6 +12,8 @@ enrollment_validator = EnrollmentValidator()
 enrollment_repository = EnrollmentRepository()
 enrollment_service = EnrollmentService(enrollment_validator, enrollment_repository)
 
+from common.utils import paginate_queryset
+
 
 def serialize_enrollment(enrollment):
     return {
@@ -26,6 +28,7 @@ def serialize_enrollment(enrollment):
 
 
 from common.decorators import enforce_permissions
+from enrollments.mappers.enrollment_mapper import EnrollmentMapper
 
 @csrf_exempt
 @enforce_permissions('enrollments', 'enrollment')
@@ -35,15 +38,15 @@ def enrollment_api(request, enrollment_id = None):
         from enrollments.models import Enrollment
         scoped_qs = apply_data_scope(request.user, Enrollment.objects.all(), 'enrollment')
         if enrollment_id is not None and not scoped_qs.filter(id=enrollment_id).exists():
-            return JsonResponse({"error": "Forbidden"}, status=403)
+            return JsonResponse({"error": Messages.FORBIDDEN}, status=403)
 
         if request.method == "GET":
             if enrollment_id is not None:
                 enrollment = enrollment_service.get(enrollment_id)
                 return JsonResponse(serialize_enrollment(enrollment))
 
-            enrollments = scoped_qs
-            return JsonResponse([serialize_enrollment(enrollment) for enrollment in enrollments], safe = False)
+            enrollments = apply_data_scope(request.user, enrollment_repository.get_queryset_for_list(), 'enrollment')
+            return paginate_queryset(request, enrollments, EnrollmentMapper.to_list_dto)
 
         if request.method == "POST":
             data = json.loads(request.body)
@@ -98,3 +101,20 @@ def enrollment_api(request, enrollment_id = None):
 
     except ValueError as e:
         return JsonResponse({"error": str(e)}, status = 400)
+
+
+def my_enrollments_api(request):
+    if request.method != "GET":
+        return JsonResponse({"error": Messages.METHOD_NOT_ALLOWED}, status = 405)
+
+    from common.permissions import authenticate_request
+    user, error = authenticate_request(request)
+    if error:
+        return error
+
+    student = getattr(user, "student_profile", None)
+    if not student:
+        return JsonResponse({"error": Messages.STUDENT_NOT_FOUND}, status = 404)
+
+    qs = enrollment_repository.get_queryset_for_list().filter(student_id = student.id, is_deleted = False)
+    return paginate_queryset(request, qs, EnrollmentMapper.to_list_dto)

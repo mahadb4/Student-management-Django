@@ -42,13 +42,13 @@ class UserService:
         )
 
         if user is None:
-            raise ValueError("Invalid email or password.")
+            raise ValueError(Messages.INVALID_EMAIL_OR_PASSWORD)
 
         if user.status == "pending":
-            raise ValueError("Your account is pending approval by an administrator.")
+            raise ValueError(Messages.ACCOUNT_PENDING_APPROVAL)
 
         if user.status == "rejected":
-            raise ValueError("Your registration was rejected.")
+            raise ValueError(Messages.REGISTRATION_REJECTED)
 
         refresh = RefreshToken.for_user(user)
 

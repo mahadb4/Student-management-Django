@@ -12,6 +12,8 @@ course_offering_validator = CourseOfferingValidator()
 course_offering_repository = CourseOfferingRepository()
 course_offering_service = CourseOfferingService(course_offering_validator, course_offering_repository)
 
+from common.utils import paginate_queryset
+
 
 def serialize_course_offering(offering):
     return {
@@ -20,7 +22,7 @@ def serialize_course_offering(offering):
         "teacher": offering.teacher_id,
         "semester": offering.semester,
         "academic_year": offering.academic_year,
-        "section": offering.section,
+        "section": offering.section_id,
         "is_active": offering.is_active,
         "created_at": offering.created_at,
         "updated_at": offering.updated_at,
@@ -29,6 +31,7 @@ def serialize_course_offering(offering):
 
 
 from common.decorators import enforce_permissions
+from course_offerings.mappers.course_offering_mapper import CourseOfferingMapper
 
 @csrf_exempt
 @enforce_permissions('course_offerings', 'courseoffering')
@@ -38,15 +41,15 @@ def course_offering_api(request, offering_id = None):
         from course_offerings.models import CourseOffering
         scoped_qs = apply_data_scope(request.user, CourseOffering.objects.all(), 'courseoffering')
         if offering_id is not None and not scoped_qs.filter(id=offering_id).exists():
-            return JsonResponse({"error": "Forbidden"}, status=403)
+            return JsonResponse({"error": Messages.FORBIDDEN}, status=403)
 
         if request.method == "GET":
             if offering_id is not None:
                 offering = course_offering_service.get(offering_id)
                 return JsonResponse(serialize_course_offering(offering))
 
-            offerings = scoped_qs
-            return JsonResponse([serialize_course_offering(offering) for offering in offerings], safe = False)
+            offerings = apply_data_scope(request.user, course_offering_repository.get_queryset_for_list(), 'courseoffering')
+            return paginate_queryset(request, offerings, CourseOfferingMapper.to_list_dto)
 
         if request.method == "POST":
             data = json.loads(request.body)
@@ -101,3 +104,20 @@ def course_offering_api(request, offering_id = None):
 
     except ValueError as e:
         return JsonResponse({"error": str(e)}, status = 400)
+
+
+def my_course_offerings_api(request):
+    if request.method != "GET":
+        return JsonResponse({"error": Messages.METHOD_NOT_ALLOWED}, status = 405)
+
+    from common.permissions import authenticate_request
+    user, error = authenticate_request(request)
+    if error:
+        return error
+
+    teacher = getattr(user, "teacher_profile", None)
+    if not teacher:
+        return JsonResponse({"error": Messages.TEACHER_NOT_FOUND}, status = 404)
+
+    qs = course_offering_repository.get_queryset_for_list().filter(teacher_id = teacher.id, is_deleted = False)
+    return paginate_queryset(request, qs, CourseOfferingMapper.to_list_dto)

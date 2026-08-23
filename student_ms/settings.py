@@ -24,6 +24,8 @@ INSTALLED_APPS = [
     'departments',
     'attendance',
     'course_offerings',
+    'semesters',
+    'sections',
     'users',
     'rest_framework',
     'rest_framework_simplejwt.token_blacklist',

@@ -10,6 +10,7 @@ urlpatterns = [
     path("attendance/", include("attendance.urls")),
     path("enrollments/", include("enrollments.urls")),
     path("course_offerings/", include("course_offerings.urls")),
+    path("sections/", include("sections.urls")),
     path("api/users/", include("users.api.urls")),
     path("api/", include("students.api.urls")),
     path("api/", include("teachers.api.urls")),
@@ -18,4 +19,6 @@ urlpatterns = [
     path("api/", include("attendance.api.urls")),
     path("api/", include("enrollments.api.urls")),
     path("api/", include("course_offerings.api.urls")),
+    path("api/", include("sections.api.urls")),
+    path("api/", include("common.api.urls")),
 ]

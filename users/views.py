@@ -84,7 +84,7 @@ def user_api(request, user_id = None):
         return JsonResponse({"error": Messages.METHOD_NOT_ALLOWED}, status = 405)
 
     except User.DoesNotExist:
-        return JsonResponse({"error": "User not found."}, status = 404)
+        return JsonResponse({"error": Messages.USER_NOT_FOUND}, status = 404)
 
 
 def pending_users_api(request):
@@ -113,7 +113,7 @@ def approve_user_api(request, user_id):
         })
 
     except User.DoesNotExist:
-        return JsonResponse({"error": "User not found."}, status = 404)
+        return JsonResponse({"error": Messages.USER_NOT_FOUND}, status = 404)
 
 
 @csrf_exempt
@@ -130,7 +130,7 @@ def reject_user_api(request, user_id):
         })
 
     except User.DoesNotExist:
-        return JsonResponse({"error": "User not found."}, status = 404)
+        return JsonResponse({"error": Messages.USER_NOT_FOUND}, status = 404)
 
 
 @csrf_exempt
@@ -142,7 +142,7 @@ def logout_api(request):
         data = json.loads(request.body)
 
         if not data.get("refresh"):
-            raise ValueError("Refresh token is required.")
+            raise ValueError(Messages.REFRESH_TOKEN_REQUIRED)
 
         user_service.logout(data["refresh"])
 
@@ -166,7 +166,7 @@ def me_api(request):
         authentication_result = authentication.authenticate(request)
 
         if authentication_result is None:
-            return JsonResponse({"error": "Authentication credentials were not provided."}, status = 401)
+            return JsonResponse({"error": Messages.AUTH_CREDENTIALS_NOT_PROVIDED}, status = 401)
 
         user, token = authentication_result
 
@@ -176,4 +176,4 @@ def me_api(request):
         })
 
     except Exception:
-        return JsonResponse({"error": "Invalid or expired token."}, status = 401)
+        return JsonResponse({"error": Messages.INVALID_OR_EXPIRED_TOKEN}, status = 401)

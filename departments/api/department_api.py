@@ -13,6 +13,8 @@ department_validator = DepartmentValidator()
 department_repository = DepartmentRepository()
 department_service = DepartmentService(department_validator, department_repository)
 
+from common.utils import paginate_queryset
+
 
 def serialize_department(department):
     return {
@@ -36,7 +38,7 @@ def department_api(request, department_id = None):
                 return JsonResponse(serialize_department(department))
 
             departments = department_service.get_all()
-            return JsonResponse([serialize_department(department) for department in departments], safe = False)
+            return paginate_queryset(request, departments, serialize_department)
 
         if request.method == "POST":
             data = json.loads(request.body)
