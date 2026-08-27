@@ -10,7 +10,7 @@ class TeacherRepository(BaseRepository):
         return self.model.objects.select_related("department").only(
             "id", "employee_id", "first_name", "last_name", "email", "designation",
             "department__id", "department__name",
-        )
+        ).order_by("id")
 
     def email_exists(self, email, exclude_id=None):
         query=self.model.objects.filter(

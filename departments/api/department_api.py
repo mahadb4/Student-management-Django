@@ -8,6 +8,7 @@ from departments.models import Department
 from departments.repositories.department_repository import DepartmentRepository
 from departments.services.department_service import DepartmentService
 from departments.services.department_validator import DepartmentValidator
+from departments.mappers.department_mapper import DepartmentMapper
 
 department_validator = DepartmentValidator()
 department_repository = DepartmentRepository()
@@ -23,8 +24,8 @@ def serialize_department(department):
         "code": department.code,
         "description": department.description,
         "is_active": department.is_active,
-        "created_at": department.created_at,
-        "updated_at": department.updated_at,
+        # "created_at": department.created_at,
+        # "updated_at": department.updated_at,
     }
 
 
@@ -37,8 +38,8 @@ def department_api(request, department_id = None):
                 department = department_service.get(department_id)
                 return JsonResponse(serialize_department(department))
 
-            departments = department_service.get_all()
-            return paginate_queryset(request, departments, serialize_department)
+            departments = department_repository.get_queryset_for_list()
+            return paginate_queryset(request, departments, DepartmentMapper.to_list_dto)
 
         if request.method == "POST":
             data = json.loads(request.body)

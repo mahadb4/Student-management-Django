@@ -13,7 +13,7 @@ class EnrollmentRepository(BaseRepository):
             "course_offering__id", "course_offering__semester", "course_offering__academic_year",
             "course_offering__course__id", "course_offering__course__name", "course_offering__course__code",
             "course_offering__section__id", "course_offering__section__name",
-        )
+        ).order_by("id")
 
     def get_by_student_and_offering(self, student_id, course_offering_id):
         return self.model.objects.filter(

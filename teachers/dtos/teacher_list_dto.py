@@ -1,9 +1,8 @@
 class TeacherListDTO:
-    def __init__(self, id, employee_id, first_name, last_name, email, designation, department):
+    def __init__(self, id, employee_id, name, email, designation, department):
         self.id = id
         self.employee_id = employee_id
-        self.first_name = first_name
-        self.last_name = last_name
+        self.name = name
         self.email = email
         self.designation = designation
         self.department = department
@@ -12,8 +11,7 @@ class TeacherListDTO:
         return {
             "id": self.id,
             "employee_id": self.employee_id,
-            "first_name": self.first_name,
-            "last_name": self.last_name,
+            "name": self.name,
             "email": self.email,
             "designation": self.designation,
             "department": self.department,

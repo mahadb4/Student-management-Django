@@ -6,6 +6,11 @@ class DepartmentRepository(BaseRepository):
     def __init__(self):
         super().__init__(Department)
 
+    def get_queryset_for_list(self):
+        return self.model.objects.only(
+            "id", "name", "code", "description", "is_active",
+        ).order_by("id")
+
     def name_exists(self, name, exclude_id=None):
         query=self.model.objects.filter(
             name__iexact=name,

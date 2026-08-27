@@ -10,7 +10,7 @@ class CourseOfferingMapper:
         )
 
         teacher = (
-            {"id": offering.teacher.id, "first_name": offering.teacher.first_name, "last_name": offering.teacher.last_name}
+            {"id": offering.teacher.id, "name": f"{offering.teacher.first_name} {offering.teacher.last_name}"}
             if offering.teacher_id else None
         )
 

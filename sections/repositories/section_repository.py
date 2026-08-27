@@ -10,7 +10,7 @@ class SectionRepository(BaseRepository):
         return self.model.objects.select_related("department").only(
             "id", "name", "semester_number", "academic_year", "is_active",
             "department__id", "department__name",
-        )
+        ).order_by("id")
 
     def section_exists(self, name, department_id, semester_number, academic_year, exclude_id=None):
         query=self.model.objects.filter(

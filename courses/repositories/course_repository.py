@@ -11,7 +11,7 @@ class CourseRepository(BaseRepository):
             "id", "code", "name", "credits",
             "department__id", "department__name",
             "teacher__id", "teacher__first_name", "teacher__last_name",
-        )
+        ).order_by("id")
 
     def code_exists(self, code, exclude_id=None):
         query=self.model.objects.filter(
