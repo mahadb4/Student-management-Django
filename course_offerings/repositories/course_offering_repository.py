@@ -11,7 +11,7 @@ class CourseOfferingRepository(BaseRepository):
             "course__id", "course__name", "course__code",
             "teacher__id", "teacher__first_name", "teacher__last_name",
             "section__id", "section__name",
-        )
+        ).order_by("id")
 
     def course_offering_exists(self,course_id,teacher_id,semester,academic_year,section_id,exclude_id = None):
         query = self.model.objects.filter(

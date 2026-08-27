@@ -11,7 +11,7 @@ class StudentRepository(BaseRepository):
             "id", "first_name", "last_name", "student_email", "is_active",
             "department__id", "department__name",
             "section__id", "section__name",
-        )
+        ).order_by("id")
 
     def email_exists(self, email, exclude_id=None):
         query=self.model.objects.filter(

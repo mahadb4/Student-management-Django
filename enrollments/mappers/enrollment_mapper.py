@@ -25,8 +25,7 @@ class EnrollmentMapper:
 
         student = {
             "id": enrollment.student.id,
-            "first_name": enrollment.student.first_name,
-            "last_name": enrollment.student.last_name,
+            "name": f"{enrollment.student.first_name} {enrollment.student.last_name}",
             "student_email": enrollment.student.student_email,
         }
 
