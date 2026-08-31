@@ -1,3 +1,4 @@
+from django.db.models import Q
 from common.repositories.base_repository import BaseRepository
 from course_offerings.models import CourseOffering
 
@@ -5,13 +6,25 @@ class CourseOfferingRepository(BaseRepository):
     def __init__(self):
         super().__init__(CourseOffering)
 
-    def get_queryset_for_list(self):
-        return self.model.objects.select_related("course", "teacher", "section").only(
+    def get_queryset_for_list(self, search = None):
+        queryset = self.model.objects.select_related("course", "teacher", "section").only(
             "id", "semester", "academic_year", "is_active",
             "course__id", "course__name", "course__code",
             "teacher__id", "teacher__first_name", "teacher__last_name",
             "section__id", "section__name",
-        )
+        ).order_by("id")
+
+        if search:
+            for term in search.split():
+                queryset = queryset.filter(
+                    Q(course__name__icontains = term)
+                    | Q(course__code__icontains = term)
+                    | Q(teacher__first_name__icontains = term)
+                    | Q(teacher__last_name__icontains = term)
+                    | Q(section__name__icontains = term)
+                )
+
+        return queryset
 
     def course_offering_exists(self,course_id,teacher_id,semester,academic_year,section_id,exclude_id = None):
         query = self.model.objects.filter(

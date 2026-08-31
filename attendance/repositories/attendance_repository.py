@@ -11,7 +11,7 @@ class AttendanceRepository(BaseRepository):
             "enrollment__student__first_name","enrollment__student__last_name",
             "enrollment__course_offering__id","enrollment__course_offering__course__id",
             "enrollment__course_offering__course__code",
-        )
+        ).order_by("id")
 
     def get_by_enrollment_and_date(self,enrollment_id,attendance_date):
         return self.model.objects.filter(

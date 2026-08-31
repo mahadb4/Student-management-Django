@@ -15,7 +15,7 @@ def section_list_view(request):
 
 
 def section_detail_view(request, section_id):
-    section = get_object_or_404(Section, id=section_id)
+    section = get_object_or_404(Section, id = section_id)
     return render(request, "sections/section_detail.html", {"section": section})
 
 
@@ -39,7 +39,7 @@ def section_create_view(request):
 
 
 def section_update_view(request, section_id):
-    section = get_object_or_404(Section, id=section_id)
+    section = get_object_or_404(Section, id = section_id)
 
     if request.method == "POST":
         data = {
@@ -52,7 +52,7 @@ def section_update_view(request, section_id):
 
         try:
             section_service.update(section_id, data)
-            return redirect("section_detail", section_id=section_id)
+            return redirect("section_detail", section_id = section_id)
         except ValueError as e:
             return render(request, "sections/section_form.html", {"section": section, "error": str(e), "data": data})
 
@@ -60,7 +60,7 @@ def section_update_view(request, section_id):
 
 
 def section_delete_view(request, section_id):
-    section = get_object_or_404(Section, id=section_id)
+    section = get_object_or_404(Section, id = section_id)
 
     if request.method == "POST":
         section_service.delete(section_id)

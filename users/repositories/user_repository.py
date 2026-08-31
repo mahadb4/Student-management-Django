@@ -18,8 +18,11 @@ class UserRepository(BaseRepository):
     def get_by_email(self, email):
         return self.model.objects.get(email__iexact = email)
 
+    def get_all(self):
+        return super().get_all().order_by("id")
+
     def get_pending(self):
-        return self.model.objects.filter(status = "pending")
+        return self.model.objects.filter(status = "pending").order_by("id")
 
     def create(self, data):
         return self.model.objects.create_user(
@@ -37,7 +40,7 @@ class UserRepository(BaseRepository):
         # Role -> Group is a direct, generic mapping (ADMIN/TEACHER/STUDENT/STAFF)
         # so every approved user actually gets the permissions enforce_permissions
         # checks for, regardless of role - no per-role special-casing needed here.
-        group, _ = Group.objects.get_or_create(name=user.role.upper())
+        group, _ = Group.objects.get_or_create(name = user.role.upper())
         user.groups.add(group)
 
         return user

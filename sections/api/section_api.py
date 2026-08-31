@@ -39,7 +39,8 @@ def section_api(request, section_id = None):
                 section = section_service.get(section_id)
                 return JsonResponse(serialize_section(section))
 
-            sections = section_repository.get_queryset_for_list()
+            search = request.GET.get("search", "").strip() or None
+            sections = section_repository.get_queryset_for_list(search = search)
             return paginate_queryset(request, sections, SectionMapper.to_list_dto)
 
         if request.method == "POST":

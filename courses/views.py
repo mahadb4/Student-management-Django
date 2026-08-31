@@ -16,12 +16,12 @@ def course_list_view(request):
 
 
 def course_detail_view(request, course_id):
-    course = get_object_or_404(Course, id=course_id)
+    course = get_object_or_404(Course, id = course_id)
     return render(request, "courses/course_detail.html", {"course": course})
 
 
 def course_create_view(request):
-    departments = Department.objects.filter(is_active=True)
+    departments = Department.objects.filter(is_active = True)
     if request.method == "POST":
         data = {
             "name": request.POST.get("name"),
@@ -43,8 +43,8 @@ def course_create_view(request):
 
 
 def course_update_view(request, course_id):
-    course = get_object_or_404(Course, id=course_id)
-    departments = Department.objects.filter(is_active=True)
+    course = get_object_or_404(Course, id = course_id)
+    departments = Department.objects.filter(is_active = True)
 
     if request.method == "POST":
         data = {
@@ -59,7 +59,7 @@ def course_update_view(request, course_id):
 
         try:
             course_service.update(course_id, data)
-            return redirect("course_detail", course_id=course_id)
+            return redirect("course_detail", course_id = course_id)
         except ValueError as e:
             return render(request, "courses/course_form.html", {"course": course, "error": str(e), "data": data, "departments": departments})
 
@@ -67,7 +67,7 @@ def course_update_view(request, course_id):
 
 
 def course_delete_view(request, course_id):
-    course = get_object_or_404(Course, id=course_id)
+    course = get_object_or_404(Course, id = course_id)
 
     if request.method == "POST":
         course_service.delete(course_id)

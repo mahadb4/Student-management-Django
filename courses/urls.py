@@ -8,9 +8,9 @@ from courses.views import (
 )
 
 urlpatterns = [
-    path("", course_list_view, name="course_list"),
-    path("create/", course_create_view, name="course_create"),
-    path("<int:course_id>/", course_detail_view, name="course_detail"),
-    path("<int:course_id>/update/", course_update_view, name="course_update"),
-    path("<int:course_id>/delete/", course_delete_view, name="course_delete"),
+    path("", course_list_view, name = "course_list"),
+    path("create/", course_create_view, name = "course_create"),
+    path("<int:course_id>/", course_detail_view, name = "course_detail"),
+    path("<int:course_id>/update/", course_update_view, name = "course_update"),
+    path("<int:course_id>/delete/", course_delete_view, name = "course_delete"),
 ]

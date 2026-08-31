@@ -15,7 +15,7 @@ def student_list_view(request):
 
 
 def student_detail_view(request, student_id):
-    student = get_object_or_404(Student, id=student_id)
+    student = get_object_or_404(Student, id = student_id)
     return render(request, "students/student_detail.html", {"student": student})
 
 
@@ -44,7 +44,7 @@ def student_create_view(request):
 
 
 def student_update_view(request, student_id):
-    student = get_object_or_404(Student, id=student_id)
+    student = get_object_or_404(Student, id = student_id)
 
     if request.method == "POST":
         data = {
@@ -62,7 +62,7 @@ def student_update_view(request, student_id):
 
         try:
             student_service.update(student_id, data)
-            return redirect("student_detail", student_id=student_id)
+            return redirect("student_detail", student_id = student_id)
         except ValueError as e:
             return render(request, "students/student_form.html", {"student": student, "error": str(e), "data": data})
 
@@ -70,7 +70,7 @@ def student_update_view(request, student_id):
 
 
 def student_delete_view(request, student_id):
-    student = get_object_or_404(Student, id=student_id)
+    student = get_object_or_404(Student, id = student_id)
 
     if request.method == "POST":
         student_service.delete(student_id)

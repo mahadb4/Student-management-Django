@@ -9,7 +9,7 @@ def admin_summary(request):
     if request.method != "GET":
         return JsonResponse(
             {"error": Messages.METHOD_NOT_ALLOWED},
-            status=405,
+            status = 405,
         )
 
     authentication = JWTAuthentication()
@@ -22,7 +22,7 @@ def admin_summary(request):
     if authentication_result is None:
         return JsonResponse(
             {"error": Messages.AUTHENTICATION_REQUIRED},
-            status=401,
+            status = 401,
         )
 
     user, _ = authentication_result
@@ -30,7 +30,7 @@ def admin_summary(request):
     if user.role != "admin" and not user.is_superuser:
         return JsonResponse(
             {"error": Messages.ADMIN_ACCESS_REQUIRED},
-            status=403,
+            status = 403,
         )
 
     from students.models import Student

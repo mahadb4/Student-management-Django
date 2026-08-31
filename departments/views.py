@@ -15,7 +15,7 @@ def department_list_view(request):
 
 
 def department_detail_view(request, department_id):
-    department = get_object_or_404(Department, id=department_id)
+    department = get_object_or_404(Department, id = department_id)
     return render(request, "departments/department_detail.html", {"department": department})
 
 
@@ -38,7 +38,7 @@ def department_create_view(request):
 
 
 def department_update_view(request, department_id):
-    department = get_object_or_404(Department, id=department_id)
+    department = get_object_or_404(Department, id = department_id)
 
     if request.method == "POST":
         data = {
@@ -50,7 +50,7 @@ def department_update_view(request, department_id):
 
         try:
             department_service.update(department_id, data)
-            return redirect("department_detail", department_id=department_id)
+            return redirect("department_detail", department_id = department_id)
         except ValueError as e:
             return render(request, "departments/department_form.html", {"department": department, "error": str(e), "data": data})
 
@@ -58,7 +58,7 @@ def department_update_view(request, department_id):
 
 
 def department_delete_view(request, department_id):
-    department = get_object_or_404(Department, id=department_id)
+    department = get_object_or_404(Department, id = department_id)
 
     if request.method == "POST":
         department_service.delete(department_id)

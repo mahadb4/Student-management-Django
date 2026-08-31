@@ -10,23 +10,23 @@ class Migration(migrations.Migration):
 
     operations = [
         migrations.RenameField(
-            model_name="courseoffering",
-            old_name="section",
-            new_name="old_section",
+            model_name = "courseoffering",
+            old_name = "section",
+            new_name = "old_section",
         ),
         migrations.AddField(
-            model_name="courseoffering",
-            name="section",
-            field=models.ForeignKey(
-                to="sections.section",
-                on_delete=django.db.models.deletion.PROTECT,
-                related_name="course_offerings",
-                null=True,
-                blank=True,
+            model_name = "courseoffering",
+            name = "section",
+            field = models.ForeignKey(
+                to = "sections.section",
+                on_delete = django.db.models.deletion.PROTECT,
+                related_name = "course_offerings",
+                null = True,
+                blank = True,
             ),
         ),
         migrations.RemoveField(
-            model_name="courseoffering",
-            name="old_section",
+            model_name = "courseoffering",
+            name = "old_section",
         ),
     ]

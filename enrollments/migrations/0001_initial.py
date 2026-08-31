@@ -15,17 +15,17 @@ class Migration(migrations.Migration):
 
     operations = [
         migrations.CreateModel(
-            name='Enrollment',
-            fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('status', models.CharField(choices=[('ACTIVE', 'Active'), ('DROPPED', 'Dropped'), ('COMPLETED', 'Completed')], default='ACTIVE', max_length=10)),
-                ('enrolled_at', models.DateTimeField(auto_now_add=True)),
-                ('updated_at', models.DateTimeField(auto_now=True)),
-                ('course_offering', models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, related_name='enrollments', to='course_offerings.courseoffering')),
-                ('student', models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, related_name='enrollments', to='students.student')),
+            name = 'Enrollment',
+            fields = [
+                ('id', models.BigAutoField(auto_created = True, primary_key = True, serialize = False, verbose_name = 'ID')),
+                ('status', models.CharField(choices = [('ACTIVE', 'Active'), ('DROPPED', 'Dropped'), ('COMPLETED', 'Completed')], default = 'ACTIVE', max_length = 10)),
+                ('enrolled_at', models.DateTimeField(auto_now_add = True)),
+                ('updated_at', models.DateTimeField(auto_now = True)),
+                ('course_offering', models.ForeignKey(on_delete = django.db.models.deletion.PROTECT, related_name = 'enrollments', to = 'course_offerings.courseoffering')),
+                ('student', models.ForeignKey(on_delete = django.db.models.deletion.PROTECT, related_name = 'enrollments', to = 'students.student')),
             ],
-            options={
-                'constraints': [models.UniqueConstraint(fields=('student', 'course_offering'), name='unique_student_course_offering')],
+            options = {
+                'constraints': [models.UniqueConstraint(fields = ('student', 'course_offering'), name = 'unique_student_course_offering')],
             },
         ),
     ]

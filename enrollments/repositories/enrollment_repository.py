@@ -1,3 +1,4 @@
+from django.db.models import Q
 from common.repositories.base_repository import BaseRepository
 from enrollments.models import Enrollment
 
@@ -6,14 +7,26 @@ class EnrollmentRepository(BaseRepository):
     def __init__(self):
         super().__init__(Enrollment)
 
-    def get_queryset_for_list(self):
-        return self.model.objects.select_related("student", "course_offering__course", "course_offering__section").only(
+    def get_queryset_for_list(self, search = None):
+        queryset = self.model.objects.select_related("student", "course_offering__course", "course_offering__section").only(
             "id", "status",
             "student__id", "student__first_name", "student__last_name", "student__student_email",
             "course_offering__id", "course_offering__semester", "course_offering__academic_year",
             "course_offering__course__id", "course_offering__course__name", "course_offering__course__code",
             "course_offering__section__id", "course_offering__section__name",
-        )
+        ).order_by("id")
+
+        if search:
+            for term in search.split():
+                queryset = queryset.filter(
+                    Q(student__first_name__icontains = term)
+                    | Q(student__last_name__icontains = term)
+                    | Q(student__student_email__icontains = term)
+                    | Q(course_offering__course__name__icontains = term)
+                    | Q(course_offering__course__code__icontains = term)
+                )
+
+        return queryset
 
     def get_by_student_and_offering(self, student_id, course_offering_id):
         return self.model.objects.filter(

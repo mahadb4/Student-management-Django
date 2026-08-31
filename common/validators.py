@@ -53,7 +53,7 @@ class CommonValidator:
             raise ValueError(f"{field_name} cannot exceed {max_length} characters.")
 
     @staticmethod
-    def validate_age(date_of_birth, minimum_age=5):
+    def validate_age(date_of_birth, minimum_age = 5):
         if not date_of_birth:
             raise ValueError(Messages.DATE_OF_BIRTH_REQUIRED)
         today = date.today()
