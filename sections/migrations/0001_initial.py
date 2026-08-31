@@ -14,20 +14,20 @@ class Migration(migrations.Migration):
 
     operations = [
         migrations.CreateModel(
-            name='Section',
-            fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('name', models.CharField(max_length=50)),
+            name = 'Section',
+            fields = [
+                ('id', models.BigAutoField(auto_created = True, primary_key = True, serialize = False, verbose_name = 'ID')),
+                ('name', models.CharField(max_length = 50)),
                 ('semester_number', models.PositiveIntegerField()),
                 ('academic_year', models.PositiveIntegerField()),
-                ('is_active', models.BooleanField(default=True)),
-                ('is_deleted', models.BooleanField(default=False)),
-                ('created_at', models.DateTimeField(auto_now_add=True)),
-                ('updated_at', models.DateTimeField(auto_now=True)),
-                ('department', models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, related_name='sections', to='departments.department')),
+                ('is_active', models.BooleanField(default = True)),
+                ('is_deleted', models.BooleanField(default = False)),
+                ('created_at', models.DateTimeField(auto_now_add = True)),
+                ('updated_at', models.DateTimeField(auto_now = True)),
+                ('department', models.ForeignKey(on_delete = django.db.models.deletion.PROTECT, related_name = 'sections', to = 'departments.department')),
             ],
-            options={
-                'constraints': [models.UniqueConstraint(fields=('name', 'department', 'semester_number', 'academic_year'), name='unique_section')],
+            options = {
+                'constraints': [models.UniqueConstraint(fields = ('name', 'department', 'semester_number', 'academic_year'), name = 'unique_section')],
             },
         ),
     ]

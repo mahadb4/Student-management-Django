@@ -18,7 +18,7 @@ class StudentService:
 
         return self.repository.create(data)
 
-    def update(self,student_id,data,partial=False):
+    def update(self,student_id,data,partial = False):
         student = self.repository.get(student_id)
 
         if not isinstance(data,dict): raise ValueError(Messages.REQUEST_DATA_MUST_BE_JSON_OBJECT)

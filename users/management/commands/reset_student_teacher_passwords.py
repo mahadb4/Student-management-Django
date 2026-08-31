@@ -14,28 +14,28 @@ class Command(BaseCommand):
     )
 
     def add_arguments(self, parser):
-        parser.add_argument("--apply", action="store_true", help="Actually write changes (default: dry run).")
+        parser.add_argument("--apply", action = "store_true", help = "Actually write changes (default: dry run).")
 
     def handle(self, *args, **options):
         apply = options["apply"]
         mode = "APPLYING" if apply else "DRY RUN (pass --apply to write changes)"
         self.stdout.write(self.style.WARNING(f"--- {mode} ---\n"))
 
-        users = User.objects.filter(role__in=["student", "teacher"]).order_by("role", "email")
+        users = User.objects.filter(role__in = ["student", "teacher"]).order_by("role", "email")
         self.stdout.write(f"Accounts targeted (role student/teacher): {users.count()}\n")
 
         changed = 0
         for user in users:
-            self.stdout.write(f"  - RESET {user.email} (role={user.role})")
+            self.stdout.write(f"  - RESET {user.email} (role = {user.role})")
             changed += 1
 
             if not apply:
                 continue
 
             user.set_password(TEMP_PASSWORD)
-            user.save(update_fields=["password"])
+            user.save(update_fields = ["password"])
 
-        excluded = User.objects.exclude(role__in=["student", "teacher"]).count()
+        excluded = User.objects.exclude(role__in = ["student", "teacher"]).count()
         self.stdout.write(f"\nAccounts excluded (admin/staff/other roles, untouched): {excluded}")
         self.stdout.write(self.style.SUCCESS(
             f"\n--- {mode} complete: {changed} account(s) {'reset' if apply else 'would be reset'} ---"

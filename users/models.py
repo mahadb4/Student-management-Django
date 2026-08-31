@@ -4,34 +4,34 @@ from common.messages import Messages
 
 
 class UserManager(BaseUserManager):
-    def create_user(self, email, name, password=None, role="student", status="pending"):
+    def create_user(self, email, name, password = None, role = "student", status = "pending"):
         if not email:
             raise ValueError(Messages.EMAIL_REQUIRED)
 
         user = self.model(
-            email=self.normalize_email(email),
-            name=name,
-            role=role,
-            status=status,
+            email = self.normalize_email(email),
+            name = name,
+            role = role,
+            status = status,
         )
 
         user.set_password(password)
-        user.save(using=self._db)
+        user.save(using = self._db)
 
         return user
 
-    def create_superuser(self, email, name, password=None):
+    def create_superuser(self, email, name, password = None):
         user = self.create_user(
-            email=email,
-            name=name,
-            password=password,
-            role="admin",
-            status="approved",
+            email = email,
+            name = name,
+            password = password,
+            role = "admin",
+            status = "approved",
         )
 
         user.is_staff = True
         user.is_superuser = True
-        user.save(using=self._db)
+        user.save(using = self._db)
 
         return user
 
@@ -50,14 +50,14 @@ class User(AbstractBaseUser, PermissionsMixin):
         ("rejected", "Rejected"),
     ]
 
-    name = models.CharField(max_length=255)
-    email = models.EmailField(unique=True)
-    role = models.CharField(max_length=20, choices=ROLE_CHOICES, default="student")
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="pending")
-    is_active = models.BooleanField(default=True)
-    is_staff = models.BooleanField(default=False)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+    name = models.CharField(max_length = 255)
+    email = models.EmailField(unique = True)
+    role = models.CharField(max_length = 20, choices = ROLE_CHOICES, default = "student")
+    status = models.CharField(max_length = 20, choices = STATUS_CHOICES, default = "pending")
+    is_active = models.BooleanField(default = True)
+    is_staff = models.BooleanField(default = False)
+    created_at = models.DateTimeField(auto_now_add = True)
+    updated_at = models.DateTimeField(auto_now = True)
 
     objects = UserManager()
 

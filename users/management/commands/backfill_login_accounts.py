@@ -18,8 +18,8 @@ class Command(BaseCommand):
     )
 
     def add_arguments(self, parser):
-        parser.add_argument("--apply", action="store_true", help="Actually write changes (default: dry run).")
-        parser.add_argument("--password", type=str, default=DEFAULT_PASSWORD, help=f"Password for newly created accounts (default: {DEFAULT_PASSWORD}).")
+        parser.add_argument("--apply", action = "store_true", help = "Actually write changes (default: dry run).")
+        parser.add_argument("--password", type = str, default = DEFAULT_PASSWORD, help = f"Password for newly created accounts (default: {DEFAULT_PASSWORD}).")
 
     def handle(self, *args, **options):
         apply = options["apply"]
@@ -36,17 +36,17 @@ class Command(BaseCommand):
 
     def _backfill_entity(self, model, role, email_field, password, apply):
         label = model.__name__
-        unlinked = model.objects.filter(user__isnull=True)
+        unlinked = model.objects.filter(user__isnull = True)
         self.stdout.write(f"{label}: {unlinked.count()} record(s) without a linked login account")
 
         for record in unlinked:
             email = getattr(record, email_field)
-            user = User.objects.filter(email__iexact=email).first()
+            user = User.objects.filter(email__iexact = email).first()
 
             if user:
                 action = f"LINK existing user ({email}) to {label} #{record.id}"
             else:
-                action = f"CREATE new user ({email}, role={role}, password={'*' * len(password)}) and link to {label} #{record.id}"
+                action = f"CREATE new user ({email}, role = {role}, password = {'*' * len(password)}) and link to {label} #{record.id}"
 
             self.stdout.write(f"  - {action}")
 
@@ -55,26 +55,26 @@ class Command(BaseCommand):
 
             if not user:
                 user = User.objects.create_user(
-                    email=email,
-                    name=f"{record.first_name} {record.last_name}".strip(),
-                    password=password,
-                    role=role,
-                    status="approved",
+                    email = email,
+                    name = f"{record.first_name} {record.last_name}".strip(),
+                    password = password,
+                    role = role,
+                    status = "approved",
                 )
             elif not user.has_usable_password():
                 # Existing user shell with no real password (e.g. created via
                 # data migration/admin without one) - safe to set a usable one.
                 user.set_password(password)
-                user.save(update_fields=["password"])
+                user.save(update_fields = ["password"])
 
             record.user = user
-            record.save(update_fields=["user"])
+            record.save(update_fields = ["user"])
 
     def _backfill_groups(self, password, apply):
         # status__iexact: a handful of pre-existing rows have "APPROVED" (uppercase),
         # inconsistent with the app's own lowercase convention - matched here rather
         # than rewritten, since correcting stored casing isn't this command's job.
-        approved_without_group = User.objects.filter(status__iexact="approved").exclude(groups__isnull=False).distinct()
+        approved_without_group = User.objects.filter(status__iexact = "approved").exclude(groups__isnull = False).distinct()
         self.stdout.write(f"\nApproved users missing their role Group: {approved_without_group.count()}")
 
         for user in approved_without_group:
@@ -83,5 +83,5 @@ class Command(BaseCommand):
             if not apply:
                 continue
 
-            group, _ = Group.objects.get_or_create(name=user.role.upper())
+            group, _ = Group.objects.get_or_create(name = user.role.upper())
             user.groups.add(group)

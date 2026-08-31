@@ -13,21 +13,21 @@ class Migration(migrations.Migration):
 
     operations = [
         migrations.RemoveField(
-            model_name='student',
-            name='student_group',
+            model_name = 'student',
+            name = 'student_group',
         ),
         migrations.RemoveField(
-            model_name='student',
-            name='teacher',
+            model_name = 'student',
+            name = 'teacher',
         ),
         migrations.AddField(
-            model_name='student',
-            name='is_deleted',
-            field=models.BooleanField(default=False),
+            model_name = 'student',
+            name = 'is_deleted',
+            field = models.BooleanField(default = False),
         ),
         migrations.AddField(
-            model_name='student',
-            name='section',
-            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.PROTECT, related_name='students', to='sections.section'),
+            model_name = 'student',
+            name = 'section',
+            field = models.ForeignKey(blank = True, null = True, on_delete = django.db.models.deletion.PROTECT, related_name = 'students', to = 'sections.section'),
         ),
     ]

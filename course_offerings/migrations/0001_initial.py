@@ -15,20 +15,20 @@ class Migration(migrations.Migration):
 
     operations = [
         migrations.CreateModel(
-            name='CourseOffering',
-            fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('semester', models.CharField(choices=[('SPRING', 'Spring'), ('SUMMER', 'Summer'), ('FALL', 'Fall')], max_length=10)),
+            name = 'CourseOffering',
+            fields = [
+                ('id', models.BigAutoField(auto_created = True, primary_key = True, serialize = False, verbose_name = 'ID')),
+                ('semester', models.CharField(choices = [('SPRING', 'Spring'), ('SUMMER', 'Summer'), ('FALL', 'Fall')], max_length = 10)),
                 ('academic_year', models.PositiveIntegerField()),
-                ('section', models.CharField(max_length=20)),
-                ('is_active', models.BooleanField(default=True)),
-                ('created_at', models.DateTimeField(auto_now_add=True)),
-                ('updated_at', models.DateTimeField(auto_now=True)),
-                ('course', models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, related_name='offerings', to='courses.course')),
-                ('teacher', models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, related_name='course_offerings', to='teachers.teacher')),
+                ('section', models.CharField(max_length = 20)),
+                ('is_active', models.BooleanField(default = True)),
+                ('created_at', models.DateTimeField(auto_now_add = True)),
+                ('updated_at', models.DateTimeField(auto_now = True)),
+                ('course', models.ForeignKey(on_delete = django.db.models.deletion.PROTECT, related_name = 'offerings', to = 'courses.course')),
+                ('teacher', models.ForeignKey(on_delete = django.db.models.deletion.PROTECT, related_name = 'course_offerings', to = 'teachers.teacher')),
             ],
-            options={
-                'constraints': [models.UniqueConstraint(fields=('course', 'teacher', 'semester', 'academic_year', 'section'), name='unique_course_offering')],
+            options = {
+                'constraints': [models.UniqueConstraint(fields = ('course', 'teacher', 'semester', 'academic_year', 'section'), name = 'unique_course_offering')],
             },
         ),
     ]

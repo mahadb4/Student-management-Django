@@ -39,8 +39,8 @@ def attendance_api(request, attendance_id = None):
         from common.permissions import apply_data_scope
         from attendance.models import Attendance
         scoped_qs = apply_data_scope(request.user, Attendance.objects.all(), 'attendance')
-        if attendance_id is not None and not scoped_qs.filter(id=attendance_id).exists():
-            return JsonResponse({"error": Messages.FORBIDDEN}, status=403)
+        if attendance_id is not None and not scoped_qs.filter(id = attendance_id).exists():
+            return JsonResponse({"error": Messages.FORBIDDEN}, status = 403)
 
         if request.method == "GET":
             if attendance_id is not None:

@@ -42,15 +42,16 @@ def student_api(request, student_id = None):
         # List responses use a projected, JOINed queryset (id/name fields + department/section
         # names only) so the Students list never needs separate Department/Section round trips.
         scoped_qs = apply_data_scope(request.user, student_repository.get_queryset_for_list(), 'student')
-        if student_id is not None and not scoped_qs.filter(id=student_id).exists():
-            return JsonResponse({"error": Messages.FORBIDDEN}, status=403)
+        if student_id is not None and not scoped_qs.filter(id = student_id).exists():
+            return JsonResponse({"error": Messages.FORBIDDEN}, status = 403)
 
         if request.method == "GET":
             if student_id is not None:
                 student = student_service.get(student_id)
                 return JsonResponse(serialize_student(student))
 
-            students = scoped_qs
+            search = request.GET.get("search", "").strip() or None
+            students = apply_data_scope(request.user, student_repository.get_queryset_for_list(search = search), 'student')
             return paginate_queryset(request, students, StudentMapper.to_list_dto)
 
         if request.method == "POST":

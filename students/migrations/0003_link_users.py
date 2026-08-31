@@ -7,10 +7,10 @@ def link_students_to_users(apps, schema_editor):
     User = apps.get_model('users', 'User')
     
     for student in Student.objects.all():
-        user = User.objects.filter(email=student.student_email).first()
+        user = User.objects.filter(email = student.student_email).first()
         if user:
             student.user = user
-            student.save(update_fields=['user'])
+            student.save(update_fields = ['user'])
 
 class Migration(migrations.Migration):
 

@@ -10,12 +10,12 @@ class Command(BaseCommand):
     )
 
     def add_arguments(self, parser):
-        parser.add_argument("--email", type=str, help="Admin email address")
-        parser.add_argument("--name", type=str, help="Admin full name")
+        parser.add_argument("--email", type = str, help = "Admin email address")
+        parser.add_argument("--name", type = str, help = "Admin full name")
         parser.add_argument(
             "--password",
-            type=str,
-            help="Admin password (omit to be prompted securely)",
+            type = str,
+            help = "Admin password (omit to be prompted securely)",
         )
 
     def handle(self, *args, **options):
@@ -40,13 +40,13 @@ class Command(BaseCommand):
         if not password or len(password) < 8:
             raise CommandError("Password must be at least 8 characters.")
 
-        if User.objects.filter(email__iexact=email).exists():
+        if User.objects.filter(email__iexact = email).exists():
             raise CommandError(f"A user with email '{email}' already exists.")
 
         user = User.objects.create_superuser(
-            email=email,
-            name=name,
-            password=password,
+            email = email,
+            name = name,
+            password = password,
         )
 
         self.stdout.write(

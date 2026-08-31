@@ -10,10 +10,10 @@ class SectionMapper:
         )
 
         return SectionListDTO(
-            id=section.id,
-            name=section.name,
-            semester_number=section.semester_number,
-            academic_year=section.academic_year,
-            is_active=section.is_active,
-            department=department,
+            id = section.id,
+            name = section.name,
+            semester_number = section.semester_number,
+            academic_year = section.academic_year,
+            is_active = section.is_active,
+            department = department,
         ).to_dict()

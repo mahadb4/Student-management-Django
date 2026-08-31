@@ -30,8 +30,8 @@ class EnrollmentMapper:
         }
 
         return EnrollmentListDTO(
-            id=enrollment.id,
-            status=enrollment.status,
-            student=student,
-            course_offering=course_offering,
+            id = enrollment.id,
+            status = enrollment.status,
+            student = student,
+            course_offering = course_offering,
         ).to_dict()

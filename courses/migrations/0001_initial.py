@@ -15,18 +15,18 @@ class Migration(migrations.Migration):
 
     operations = [
         migrations.CreateModel(
-            name='Course',
-            fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('name', models.CharField(max_length=150)),
-                ('code', models.CharField(max_length=20, unique=True)),
-                ('description', models.TextField(blank=True, null=True)),
+            name = 'Course',
+            fields = [
+                ('id', models.BigAutoField(auto_created = True, primary_key = True, serialize = False, verbose_name = 'ID')),
+                ('name', models.CharField(max_length = 150)),
+                ('code', models.CharField(max_length = 20, unique = True)),
+                ('description', models.TextField(blank = True, null = True)),
                 ('credits', models.PositiveIntegerField()),
-                ('is_active', models.BooleanField(default=True)),
-                ('created_at', models.DateTimeField(auto_now_add=True)),
-                ('updated_at', models.DateTimeField(auto_now=True)),
-                ('department', models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, related_name='courses', to='departments.department')),
-                ('teacher', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='courses', to='teachers.teacher')),
+                ('is_active', models.BooleanField(default = True)),
+                ('created_at', models.DateTimeField(auto_now_add = True)),
+                ('updated_at', models.DateTimeField(auto_now = True)),
+                ('department', models.ForeignKey(on_delete = django.db.models.deletion.PROTECT, related_name = 'courses', to = 'departments.department')),
+                ('teacher', models.ForeignKey(blank = True, null = True, on_delete = django.db.models.deletion.SET_NULL, related_name = 'courses', to = 'teachers.teacher')),
             ],
         ),
     ]

@@ -20,9 +20,9 @@ class AttendanceMapper:
         )
 
         return AttendanceListDTO(
-            id=attendance.id,
-            date=attendance.date,
-            status=attendance.status,
-            remarks=attendance.remarks,
-            enrollment=enrollment,
+            id = attendance.id,
+            date = attendance.date,
+            status = attendance.status,
+            remarks = attendance.remarks,
+            enrollment = enrollment,
         ).to_dict()

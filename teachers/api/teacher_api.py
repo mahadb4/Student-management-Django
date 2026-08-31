@@ -46,15 +46,16 @@ def teacher_api(request, teacher_id = None):
         from common.permissions import apply_data_scope
         from teachers.models import Teacher
         scoped_qs = apply_data_scope(request.user, Teacher.objects.all(), 'teacher')
-        if teacher_id is not None and not scoped_qs.filter(id=teacher_id).exists():
-            return JsonResponse({"error": Messages.FORBIDDEN}, status=403)
+        if teacher_id is not None and not scoped_qs.filter(id = teacher_id).exists():
+            return JsonResponse({"error": Messages.FORBIDDEN}, status = 403)
 
         if request.method == "GET":
             if teacher_id is not None:
                 teacher = teacher_service.get(teacher_id)
                 return JsonResponse(serialize_teacher(teacher))
 
-            list_qs = apply_data_scope(request.user, teacher_repository.get_queryset_for_list(), 'teacher')
+            search = request.GET.get("search", "").strip() or None
+            list_qs = apply_data_scope(request.user, teacher_repository.get_queryset_for_list(search = search), 'teacher')
             return paginate_queryset(request, list_qs, TeacherMapper.to_list_dto)
 
         if request.method == "POST":

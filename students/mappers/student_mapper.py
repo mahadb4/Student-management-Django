@@ -15,9 +15,9 @@ class StudentMapper:
 
         return StudentListDTO(
             id = student.id,
-            name=f"{student.first_name} {student.last_name}",
-            student_email=student.student_email,
-            is_active=student.is_active,
-            department=department,
-            section=section,
+            name = f"{student.first_name} {student.last_name}",
+            student_email = student.student_email,
+            is_active = student.is_active,
+            department = department,
+            section = section,
         ).to_dict()

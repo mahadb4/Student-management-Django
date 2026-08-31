@@ -20,11 +20,11 @@ class CourseOfferingMapper:
         )
 
         return CourseOfferingListDTO(
-            id=offering.id,
-            semester=offering.semester,
-            academic_year=offering.academic_year,
-            is_active=offering.is_active,
-            course=course,
-            teacher=teacher,
-            section=section,
+            id = offering.id,
+            semester = offering.semester,
+            academic_year = offering.academic_year,
+            is_active = offering.is_active,
+            course = course,
+            teacher = teacher,
+            section = section,
         ).to_dict()
