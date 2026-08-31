@@ -14,18 +14,18 @@ class Migration(migrations.Migration):
 
     operations = [
         migrations.CreateModel(
-            name='Attendance',
-            fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
+            name = 'Attendance',
+            fields = [
+                ('id', models.BigAutoField(auto_created = True, primary_key = True, serialize = False, verbose_name = 'ID')),
                 ('date', models.DateField()),
-                ('status', models.CharField(choices=[('PRESENT', 'Present'), ('ABSENT', 'Absent'), ('LATE', 'Late')], max_length=10)),
-                ('remarks', models.CharField(blank=True, max_length=255, null=True)),
-                ('created_at', models.DateTimeField(auto_now_add=True)),
-                ('updated_at', models.DateTimeField(auto_now=True)),
-                ('enrollment', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.CASCADE, related_name='attendance_records', to='enrollments.enrollment')),
+                ('status', models.CharField(choices = [('PRESENT', 'Present'), ('ABSENT', 'Absent'), ('LATE', 'Late')], max_length = 10)),
+                ('remarks', models.CharField(blank = True, max_length = 255, null = True)),
+                ('created_at', models.DateTimeField(auto_now_add = True)),
+                ('updated_at', models.DateTimeField(auto_now = True)),
+                ('enrollment', models.ForeignKey(blank = True, null = True, on_delete = django.db.models.deletion.CASCADE, related_name = 'attendance_records', to = 'enrollments.enrollment')),
             ],
-            options={
-                'constraints': [models.UniqueConstraint(fields=('enrollment', 'date'), name='unique_enrollment_date')],
+            options = {
+                'constraints': [models.UniqueConstraint(fields = ('enrollment', 'date'), name = 'unique_enrollment_date')],
             },
         ),
     ]

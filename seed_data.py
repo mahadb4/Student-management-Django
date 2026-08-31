@@ -29,8 +29,8 @@ def seed_data():
 
     for name, code in department_data:
         department, _ = Department.objects.get_or_create(
-            code=code,
-            defaults={
+            code = code,
+            defaults = {
                 "name": name,
                 "description": f"{name} Department",
                 "is_active": True,
@@ -92,8 +92,8 @@ def seed_data():
         gender,
     ) in enumerate(teacher_data):
         teacher, _ = Teacher.objects.get_or_create(
-            employee_id=employee_id,
-            defaults={
+            employee_id = employee_id,
+            defaults = {
                 "first_name": first_name,
                 "last_name": last_name,
                 "email": email,
@@ -146,8 +146,8 @@ def seed_data():
         gender,
     ) in enumerate(student_data):
         student, _ = Student.objects.get_or_create(
-            student_email=email,
-            defaults={
+            student_email = email,
+            defaults = {
                 "first_name": first_name,
                 "last_name": last_name,
                 "parents_phone_number": f"+9231010000{index + 1:02d}",
@@ -188,8 +188,8 @@ def seed_data():
 
     for index, (name, code) in enumerate(course_data):
         course, _ = Course.objects.get_or_create(
-            code=code,
-            defaults={
+            code = code,
+            defaults = {
                 "name": name,
                 "description": f"{name} course.",
                 "credits": 3,
@@ -209,12 +209,12 @@ def seed_data():
 
     for index in range(10):
         offering, _ = CourseOffering.objects.get_or_create(
-            course=courses[index],
-            teacher=teachers[index],
-            semester="FALL",
-            academic_year=2026,
-            section="A",
-            defaults={
+            course = courses[index],
+            teacher = teachers[index],
+            semester = "FALL",
+            academic_year = 2026,
+            section = "A",
+            defaults = {
                 "is_active": True,
             },
         )
@@ -230,9 +230,9 @@ def seed_data():
     # First 10 students are enrolled in their corresponding offering.
     for index in range(10):
         enrollment, _ = Enrollment.objects.get_or_create(
-            student=students[index],
-            course_offering=offerings[index],
-            defaults={
+            student = students[index],
+            course_offering = offerings[index],
+            defaults = {
                 "status": "ACTIVE",
             },
         )
@@ -242,9 +242,9 @@ def seed_data():
     # Additional students enrolled in Calculus.
     for index in range(10):
         enrollment, _ = Enrollment.objects.get_or_create(
-            student=students[index],
-            course_offering=offerings[9],
-            defaults={
+            student = students[index],
+            course_offering = offerings[9],
+            defaults = {
                 "status": "ACTIVE",
             },
         )
@@ -272,9 +272,9 @@ def seed_data():
 
     for index, enrollment in enumerate(enrollments[:10]):
         attendance, _ = Attendance.objects.get_or_create(
-            enrollment=enrollment,
-            date=date(2026, 8, 10),
-            defaults={
+            enrollment = enrollment,
+            date = date(2026, 8, 10),
+            defaults = {
                 "status": attendance_statuses[index],
                 "remarks": "",
             },

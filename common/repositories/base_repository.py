@@ -1,4 +1,5 @@
 class BaseRepository:
+
     def __init__(self, model):
         self.model = model
 
@@ -6,15 +7,15 @@ class BaseRepository:
         queryset = self.model.objects
 
         if hasattr(self.model, "is_deleted"):
-            queryset = queryset.filter(is_deleted=False)
+            queryset = queryset.filter(is_deleted = False)
 
-        return queryset.get(id=object_id)
+        return queryset.get(id = object_id)
 
     def get_all(self):
         queryset = self.model.objects
 
         if hasattr(self.model, "is_deleted"):
-            queryset = queryset.filter(is_deleted=False)
+            queryset = queryset.filter(is_deleted = False)
 
         return queryset.all()
 
@@ -28,6 +29,6 @@ class BaseRepository:
             if hasattr(obj, "updated_at"):
                 update_fields.append("updated_at")
 
-            obj.save(update_fields=update_fields)
+            obj.save(update_fields = update_fields)
         else:
             obj.delete()

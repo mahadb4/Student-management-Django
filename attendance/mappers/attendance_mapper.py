@@ -8,12 +8,11 @@ class AttendanceMapper:
             {
                 "id": attendance.enrollment.id,
                 "student": {
-                    "id": attendance.enrollment.student.id,
-                    "first_name": attendance.enrollment.student.first_name,
-                    "last_name": attendance.enrollment.student.last_name,
+                    # "id": attendance.enrollment.student.id,
+                    "name": f"{attendance.enrollment.student.first_name} {attendance.enrollment.student.last_name}",
                 },
                 "course": {
-                    "id": attendance.enrollment.course_offering.course.id,
+                    # "id": attendance.enrollment.course_offering.course.id,
                     "code": attendance.enrollment.course_offering.course.code,
                 },
             }
@@ -21,9 +20,9 @@ class AttendanceMapper:
         )
 
         return AttendanceListDTO(
-            id=attendance.id,
-            date=attendance.date,
-            status=attendance.status,
-            remarks=attendance.remarks,
-            enrollment=enrollment,
+            id = attendance.id,
+            date = attendance.date,
+            status = attendance.status,
+            remarks = attendance.remarks,
+            enrollment = enrollment,
         ).to_dict()

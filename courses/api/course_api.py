@@ -39,7 +39,8 @@ def course_api(request, course_id = None):
                 course = course_service.get(course_id)
                 return JsonResponse(serialize_course(course))
 
-            courses = course_repository.get_queryset_for_list()
+            search = request.GET.get("search", "").strip() or None
+            courses = course_repository.get_queryset_for_list(search = search)
             return paginate_queryset(request, courses, CourseMapper.to_list_dto)
 
         if request.method == "POST":

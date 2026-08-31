@@ -5,16 +5,15 @@ class TeacherMapper:
     @staticmethod
     def to_list_dto(teacher):
         department = (
-            {"id": teacher.department.id, "name": teacher.department.name}
+            {"name": teacher.department.name}
             if teacher.department_id else None
         )
 
         return TeacherListDTO(
-            id=teacher.id,
-            employee_id=teacher.employee_id,
-            first_name=teacher.first_name,
-            last_name=teacher.last_name,
-            email=teacher.email,
-            designation=teacher.designation,
-            department=department,
+            id = teacher.id,
+            employee_id = teacher.employee_id,
+            name = f"{teacher.first_name} {teacher.last_name}",
+            email = teacher.email,
+            designation = teacher.designation,
+            department = department,
         ).to_dict()

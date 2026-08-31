@@ -14,8 +14,8 @@ class Migration(migrations.Migration):
 
     operations = [
         migrations.AddField(
-            model_name='student',
-            name='user',
-            field=models.OneToOneField(blank=True, null=True, on_delete=django.db.models.deletion.CASCADE, related_name='student_profile', to=settings.AUTH_USER_MODEL),
+            model_name = 'student',
+            name = 'user',
+            field = models.OneToOneField(blank = True, null = True, on_delete = django.db.models.deletion.CASCADE, related_name = 'student_profile', to = settings.AUTH_USER_MODEL),
         ),
     ]

@@ -40,15 +40,16 @@ def course_offering_api(request, offering_id = None):
         from common.permissions import apply_data_scope
         from course_offerings.models import CourseOffering
         scoped_qs = apply_data_scope(request.user, CourseOffering.objects.all(), 'courseoffering')
-        if offering_id is not None and not scoped_qs.filter(id=offering_id).exists():
-            return JsonResponse({"error": Messages.FORBIDDEN}, status=403)
+        if offering_id is not None and not scoped_qs.filter(id = offering_id).exists():
+            return JsonResponse({"error": Messages.FORBIDDEN}, status = 403)
 
         if request.method == "GET":
             if offering_id is not None:
                 offering = course_offering_service.get(offering_id)
                 return JsonResponse(serialize_course_offering(offering))
 
-            offerings = apply_data_scope(request.user, course_offering_repository.get_queryset_for_list(), 'courseoffering')
+            search = request.GET.get("search", "").strip() or None
+            offerings = apply_data_scope(request.user, course_offering_repository.get_queryset_for_list(search = search), 'courseoffering')
             return paginate_queryset(request, offerings, CourseOfferingMapper.to_list_dto)
 
         if request.method == "POST":
