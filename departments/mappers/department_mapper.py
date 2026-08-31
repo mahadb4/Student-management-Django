@@ -1,4 +1,5 @@
 from departments.dtos.department_list_dto import DepartmentListDTO
+from departments.dtos.department_reference_dto import DepartmentReferenceDTO
 
 
 class DepartmentMapper:
@@ -10,4 +11,11 @@ class DepartmentMapper:
             code = department.code,
             description = department.description,
             is_active = department.is_active,
+        ).to_dict()
+
+    @staticmethod
+    def to_reference_dto(department):
+        return DepartmentReferenceDTO(
+            id = department.id,
+            name = department.name,
         ).to_dict()

@@ -96,3 +96,17 @@ def section_api(request, section_id = None):
 
     except ValueError as e:
         return JsonResponse({"error": str(e)}, status = 400)
+
+
+@csrf_exempt
+@enforce_permissions('sections', 'section')
+def section_reference_api(request):
+    if request.method != "GET":
+        return JsonResponse({"error": Messages.METHOD_NOT_ALLOWED}, status = 405)
+
+    department_id = request.GET.get("department_id") or None
+    sections = section_repository.get_queryset_for_reference(department_id = department_id)
+    return JsonResponse(
+        [SectionMapper.to_reference_dto(section) for section in sections],
+        safe = False,
+    )

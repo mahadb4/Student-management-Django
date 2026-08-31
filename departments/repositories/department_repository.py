@@ -21,6 +21,11 @@ class DepartmentRepository(BaseRepository):
 
         return queryset
 
+    def get_queryset_for_reference(self):
+        return self.model.objects.filter(is_deleted = False).only(
+            "id", "name",
+        ).order_by("name")
+
     def name_exists(self, name, exclude_id = None):
         query = self.model.objects.filter(
             name__iexact = name,

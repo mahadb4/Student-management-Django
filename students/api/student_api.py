@@ -109,6 +109,20 @@ def student_api(request, student_id = None):
         return JsonResponse({"error": str(e)}, status = 400)
 
 
+@csrf_exempt
+@enforce_permissions('students', 'student')
+def student_reference_api(request):
+    if request.method != "GET":
+        return JsonResponse({"error": Messages.METHOD_NOT_ALLOWED}, status = 405)
+
+    from common.permissions import apply_data_scope
+    students = apply_data_scope(request.user, student_repository.get_queryset_for_reference(), 'student')
+    return JsonResponse(
+        [StudentMapper.to_reference_dto(student) for student in students],
+        safe = False,
+    )
+
+
 def my_profile_api(request):
     if request.method != "GET":
         return JsonResponse({"error": Messages.METHOD_NOT_ALLOWED}, status = 405)

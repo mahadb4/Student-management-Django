@@ -27,6 +27,11 @@ class StudentRepository(BaseRepository):
 
         return queryset
 
+    def get_queryset_for_reference(self):
+        return self.model.objects.filter(is_deleted = False).only(
+            "id", "first_name", "last_name", "student_email",
+        ).order_by("first_name", "last_name")
+
     def email_exists(self, email, exclude_id = None):
         query = self.model.objects.filter(
             student_email__iexact = email,

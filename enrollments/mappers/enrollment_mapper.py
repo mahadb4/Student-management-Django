@@ -5,13 +5,12 @@ class EnrollmentMapper:
     @staticmethod
     def to_list_dto(enrollment):
         course = {
-            "id": enrollment.course_offering.course.id,
             "name": enrollment.course_offering.course.name,
             "code": enrollment.course_offering.course.code,
         }
 
         section = (
-            {"id": enrollment.course_offering.section.id, "name": enrollment.course_offering.section.name}
+            {"name": enrollment.course_offering.section.name}
             if enrollment.course_offering.section_id else None
         )
 

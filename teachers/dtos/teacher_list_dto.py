@@ -1,11 +1,12 @@
 class TeacherListDTO:
-    def __init__(self, id, employee_id, name, email, designation, department):
+    def __init__(self, id, employee_id, name, email, designation, department_id, department_name):
         self.id = id
         self.employee_id = employee_id
         self.name = name
         self.email = email
         self.designation = designation
-        self.department = department
+        self.department_id = department_id
+        self.department_name = department_name
 
     def to_dict(self):
         return {
@@ -14,5 +15,6 @@ class TeacherListDTO:
             "name": self.name,
             "email": self.email,
             "designation": self.designation,
-            "department": self.department,
+            "department_id": self.department_id,
+            "department_name": self.department_name,
         }

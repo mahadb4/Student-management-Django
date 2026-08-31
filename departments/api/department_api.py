@@ -95,3 +95,16 @@ def department_api(request, department_id = None):
 
     except ValueError as e:
         return JsonResponse({"error": str(e)}, status = 400)
+
+
+@csrf_exempt
+@enforce_permissions('departments', 'department')
+def department_reference_api(request):
+    if request.method != "GET":
+        return JsonResponse({"error": Messages.METHOD_NOT_ALLOWED}, status = 405)
+
+    departments = department_repository.get_queryset_for_reference()
+    return JsonResponse(
+        [DepartmentMapper.to_reference_dto(department) for department in departments],
+        safe = False,
+    )

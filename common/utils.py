@@ -25,7 +25,7 @@ def parse_json_request(request):
 def paginate_queryset(request, #Contains: ?page=2&page_size=10
                       queryset, #This is the database data to paginate like students.objects.all()
                       serializer_func, 
-                      default_page_size = 50, 
+                      default_page_size = 10,
                       max_page_size = 500):
     try:
         page_size = int(

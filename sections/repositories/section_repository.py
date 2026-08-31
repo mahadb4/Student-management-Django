@@ -22,6 +22,16 @@ class SectionRepository(BaseRepository):
 
         return queryset
 
+    def get_queryset_for_reference(self, department_id = None):
+        queryset = self.model.objects.filter(is_deleted = False).only(
+            "id", "name", "department_id",
+        ).order_by("name")
+
+        if department_id is not None:
+            queryset = queryset.filter(department_id = department_id)
+
+        return queryset
+
     def section_exists(self, name, department_id, semester_number, academic_year, exclude_id = None):
         query = self.model.objects.filter(
             name__iexact = name,
