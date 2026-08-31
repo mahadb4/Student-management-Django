@@ -98,6 +98,20 @@ def teacher_api(request, teacher_id = None):
         return JsonResponse({"error": str(e)}, status = 400)
 
 
+@csrf_exempt
+@enforce_permissions('teachers', 'teacher')
+def teacher_reference_api(request):
+    if request.method != "GET":
+        return JsonResponse({"error": Messages.METHOD_NOT_ALLOWED}, status = 405)
+
+    from common.permissions import apply_data_scope
+    teachers = apply_data_scope(request.user, teacher_repository.get_queryset_for_reference(), 'teacher')
+    return JsonResponse(
+        [TeacherMapper.to_reference_dto(teacher) for teacher in teachers],
+        safe = False,
+    )
+
+
 def my_profile_api(request):
     if request.method != "GET":
         return JsonResponse({"error": Messages.METHOD_NOT_ALLOWED}, status = 405)

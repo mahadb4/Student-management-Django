@@ -24,6 +24,11 @@ class CourseRepository(BaseRepository):
 
         return queryset
 
+    def get_queryset_for_reference(self):
+        return self.model.objects.only(
+            "id", "name", "code",
+        ).order_by("name")
+
     def code_exists(self, code, exclude_id = None):
         query = self.model.objects.filter(
             code__iexact = code,
