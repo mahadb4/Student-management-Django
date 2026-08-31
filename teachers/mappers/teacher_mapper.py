@@ -10,10 +10,10 @@ class TeacherMapper:
         )
 
         return TeacherListDTO(
-            id=teacher.id,
-            employee_id=teacher.employee_id,
-            name=f"{teacher.first_name} {teacher.last_name}",
-            email=teacher.email,
-            designation=teacher.designation,
-            department=department,
+            id = teacher.id,
+            employee_id = teacher.employee_id,
+            name = f"{teacher.first_name} {teacher.last_name}",
+            email = teacher.email,
+            designation = teacher.designation,
+            department = department,
         ).to_dict()

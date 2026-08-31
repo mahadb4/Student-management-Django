@@ -38,7 +38,8 @@ def department_api(request, department_id = None):
                 department = department_service.get(department_id)
                 return JsonResponse(serialize_department(department))
 
-            departments = department_repository.get_queryset_for_list()
+            search = request.GET.get("search", "").strip() or None
+            departments = department_repository.get_queryset_for_list(search = search)
             return paginate_queryset(request, departments, DepartmentMapper.to_list_dto)
 
         if request.method == "POST":

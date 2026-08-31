@@ -25,14 +25,14 @@ class TeacherService:
 
         return self.repository.create(data)
 
-    def update(self,teacher_id,data,partial=False):
+    def update(self,teacher_id,data,partial = False):
         teacher = self.repository.get(teacher_id)
 
         if not isinstance(data,dict): raise ValueError(Messages.REQUEST_DATA_MUST_BE_JSON_OBJECT)
 
         if partial: data = self._merge_data(teacher,data)
 
-        self.validator.validate(data)
+        self.validator.validate(data,teacher_id)
 
         email = data["email"].strip()
         employee_id = data["employee_id"].strip()

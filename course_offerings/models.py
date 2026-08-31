@@ -9,21 +9,21 @@ class CourseOffering(models.Model):
         SUMMER = "SUMMER","Summer"
         FALL = "FALL","Fall"
 
-    course = models.ForeignKey(Course,on_delete=models.PROTECT,related_name="offerings")
-    teacher = models.ForeignKey(Teacher,on_delete=models.PROTECT,related_name="course_offerings")
-    semester = models.CharField(max_length=10,choices=Semester.choices)
+    course = models.ForeignKey(Course,on_delete = models.PROTECT,related_name = "offerings")
+    teacher = models.ForeignKey(Teacher,on_delete = models.PROTECT,related_name = "course_offerings")
+    semester = models.CharField(max_length = 10,choices = Semester.choices)
     academic_year = models.PositiveIntegerField()
-    section = models.ForeignKey(Section,on_delete=models.PROTECT,related_name="course_offerings",null=True,blank=True)
-    is_active = models.BooleanField(default=True)
-    is_deleted = models.BooleanField(default=False)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+    section = models.ForeignKey(Section,on_delete = models.PROTECT,related_name = "course_offerings",null = True,blank = True)
+    is_active = models.BooleanField(default = True)
+    is_deleted = models.BooleanField(default = False)
+    created_at = models.DateTimeField(auto_now_add = True)
+    updated_at = models.DateTimeField(auto_now = True)
 
     class Meta:
         constraints = [
             models.UniqueConstraint(
-                fields=["course","teacher","semester","academic_year","section"],
-                name="unique_course_offering"
+                fields = ["course","teacher","semester","academic_year","section"],
+                name = "unique_course_offering"
             )
         ]
 

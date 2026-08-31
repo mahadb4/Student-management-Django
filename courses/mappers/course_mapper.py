@@ -15,10 +15,10 @@ class CourseMapper:
         )
 
         return CourseListDTO(
-            id=course.id,
-            code=course.code,
-            name=course.name,
-            credits=course.credits,
-            department=department,
-            teacher=teacher,
+            id = course.id,
+            code = course.code,
+            name = course.name,
+            credits = course.credits,
+            department = department,
+            teacher = teacher,
         ).to_dict()

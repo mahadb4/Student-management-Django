@@ -16,7 +16,7 @@ def teacher_list_view(request):
 
 
 def teacher_detail_view(request, teacher_id):
-    teacher = get_object_or_404(Teacher, id=teacher_id)
+    teacher = get_object_or_404(Teacher, id = teacher_id)
     return render(request, "teachers/teacher_detail.html", {"teacher": teacher})
 
 

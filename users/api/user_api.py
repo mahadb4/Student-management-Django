@@ -31,12 +31,12 @@ def _create_own_profile(user, profile):
     if user.role == "student":
         student = student_service.create({**profile, "student_email": user.email})
         student.user = user
-        student.save(update_fields=["user"])
+        student.save(update_fields = ["user"])
         return student
     if user.role == "teacher":
         teacher = teacher_service.create({**profile, "email": user.email})
         teacher.user = user
-        teacher.save(update_fields=["user"])
+        teacher.save(update_fields = ["user"])
         return teacher
     return None
 
@@ -59,8 +59,12 @@ def serialize_user(user):
     }
 
 
+from common.decorators import enforce_permissions
+
+
 @csrf_exempt
-def user_api(request, user_id=None):
+@enforce_permissions('users', 'user')
+def user_api(request, user_id = None):
     try:
         if request.method == "GET":
             if user_id is not None:
@@ -72,13 +76,13 @@ def user_api(request, user_id=None):
 
         return JsonResponse(
             {"error": Messages.METHOD_NOT_ALLOWED},
-            status=405,
+            status = 405,
         )
 
     except User.DoesNotExist:
         return JsonResponse(
             {"error": Messages.USER_NOT_FOUND_BY_ID.format(user_id)},
-            status=404,
+            status = 404,
         )
 
 
@@ -88,7 +92,7 @@ def register_api(request):
         if request.method != "POST":
             return JsonResponse(
                 {"error": Messages.METHOD_NOT_ALLOWED},
-                status=405,
+                status = 405,
             )
 
         data = json.loads(request.body)
@@ -103,19 +107,19 @@ def register_api(request):
                 "message": Messages.USER_REGISTRATION_SUCCESSFUL,
                 "user": serialize_user(user),
             },
-            status=201,
+            status = 201,
         )
 
     except json.JSONDecodeError:
         return JsonResponse(
             {"error": Messages.INVALID_JSON},
-            status=400,
+            status = 400,
         )
 
     except ValueError as e:
         return JsonResponse(
             {"error": str(e)},
-            status=400,
+            status = 400,
         )
 
 
@@ -125,7 +129,7 @@ def login_api(request):
         if request.method != "POST":
             return JsonResponse(
                 {"error": Messages.METHOD_NOT_ALLOWED},
-                status=405,
+                status = 405,
             )
 
         data = json.loads(request.body)
@@ -146,23 +150,24 @@ def login_api(request):
     except json.JSONDecodeError:
         return JsonResponse(
             {"error": Messages.INVALID_JSON},
-            status=400,
+            status = 400,
         )
 
     except ValueError as e:
         return JsonResponse(
             {"error": str(e)},
-            status=400,
+            status = 400,
         )
 
 
 @csrf_exempt
+@enforce_permissions('users', 'user')
 def approve_user_api(request, user_id):
     try:
         if request.method != "PATCH":
             return JsonResponse(
                 {"error": Messages.METHOD_NOT_ALLOWED},
-                status=405,
+                status = 405,
             )
 
         # One-click for every role: approval only grants login + Group access.
@@ -180,17 +185,18 @@ def approve_user_api(request, user_id):
     except User.DoesNotExist:
         return JsonResponse(
             {"error": Messages.USER_NOT_FOUND_BY_ID.format(user_id)},
-            status=404,
+            status = 404,
         )
 
 
 @csrf_exempt
+@enforce_permissions('users', 'user')
 def reject_user_api(request, user_id):
     try:
         if request.method != "PATCH":
             return JsonResponse(
                 {"error": Messages.METHOD_NOT_ALLOWED},
-                status=405,
+                status = 405,
             )
 
         user = user_service.reject(user_id)
@@ -205,7 +211,7 @@ def reject_user_api(request, user_id):
     except User.DoesNotExist:
         return JsonResponse(
             {"error": Messages.USER_NOT_FOUND_BY_ID.format(user_id)},
-            status=404,
+            status = 404,
         )
 
 
@@ -215,7 +221,7 @@ def logout_api(request):
         if request.method != "POST":
             return JsonResponse(
                 {"error": Messages.METHOD_NOT_ALLOWED},
-                status=405,
+                status = 405,
             )
 
         data = json.loads(request.body)
@@ -230,26 +236,27 @@ def logout_api(request):
 
         user_service.logout(refresh_token)
 
-        return HttpResponse(status=204)
+        return HttpResponse(status = 204)
 
     except json.JSONDecodeError:
         return JsonResponse(
             {"error": Messages.INVALID_JSON},
-            status=400,
+            status = 400,
         )
 
     except ValueError as e:
         return JsonResponse(
             {"error": str(e)},
-            status=400,
+            status = 400,
         )
 
 
+@enforce_permissions('users', 'user')
 def pending_users_api(request):
     if request.method != "GET":
         return JsonResponse(
             {"error": Messages.METHOD_NOT_ALLOWED},
-            status=405,
+            status = 405,
         )
 
     users = user_service.get_pending()
@@ -261,7 +268,7 @@ def me_api(request):
         if request.method != "GET":
             return JsonResponse(
                 {"error": Messages.METHOD_NOT_ALLOWED},
-                status=405,
+                status = 405,
             )
 
         authentication = JWTAuthentication()
@@ -270,7 +277,7 @@ def me_api(request):
         if authentication_result is None:
             return JsonResponse(
                 {"error": Messages.AUTH_CREDENTIALS_NOT_PROVIDED},
-                status=401,
+                status = 401,
             )
 
         user, _ = authentication_result
@@ -282,7 +289,7 @@ def me_api(request):
     except Exception:
         return JsonResponse(
             {"error": Messages.INVALID_OR_EXPIRED_TOKEN},
-            status=401,
+            status = 401,
         )
 
 
@@ -292,7 +299,7 @@ def complete_onboarding_api(request):
         if request.method != "POST":
             return JsonResponse(
                 {"error": Messages.METHOD_NOT_ALLOWED},
-                status=405,
+                status = 405,
             )
 
         authentication = JWTAuthentication()
@@ -301,7 +308,7 @@ def complete_onboarding_api(request):
         if authentication_result is None:
             return JsonResponse(
                 {"error": Messages.AUTH_CREDENTIALS_NOT_PROVIDED},
-                status=401,
+                status = 401,
             )
 
         user, _ = authentication_result
@@ -309,13 +316,13 @@ def complete_onboarding_api(request):
         if user.role not in ("student", "teacher"):
             return JsonResponse(
                 {"error": Messages.INVALID_REQUEST},
-                status=400,
+                status = 400,
             )
 
         if getattr(user, "student_profile", None) or getattr(user, "teacher_profile", None):
             return JsonResponse(
                 {"error": Messages.INVALID_REQUEST},
-                status=400,
+                status = 400,
             )
 
         data = json.loads(request.body)
@@ -328,23 +335,23 @@ def complete_onboarding_api(request):
 
         return JsonResponse(
             {"user": serialize_user(user)},
-            status=201,
+            status = 201,
         )
 
     except json.JSONDecodeError:
         return JsonResponse(
             {"error": Messages.INVALID_JSON},
-            status=400,
+            status = 400,
         )
 
     except ValueError as e:
         return JsonResponse(
             {"error": str(e)},
-            status=400,
+            status = 400,
         )
 
     except Exception:
         return JsonResponse(
             {"error": Messages.INVALID_OR_EXPIRED_TOKEN},
-            status=401,
+            status = 401,
         )

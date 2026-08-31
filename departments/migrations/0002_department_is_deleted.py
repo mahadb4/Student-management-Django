@@ -11,8 +11,8 @@ class Migration(migrations.Migration):
 
     operations = [
         migrations.AddField(
-            model_name='department',
-            name='is_deleted',
-            field=models.BooleanField(default=False),
+            model_name = 'department',
+            name = 'is_deleted',
+            field = models.BooleanField(default = False),
         ),
     ]
