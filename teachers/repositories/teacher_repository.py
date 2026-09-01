@@ -25,10 +25,15 @@ class TeacherRepository(BaseRepository):
 
         return queryset
 
-    def get_queryset_for_reference(self):
-        return self.model.objects.filter(is_deleted = False).only(
-            "id", "first_name", "last_name",
+    def get_queryset_for_reference(self, department_id = None):
+        queryset = self.model.objects.filter(is_deleted = False).only(
+            "id", "first_name", "last_name", "department_id",
         ).order_by("first_name", "last_name")
+
+        if department_id is not None:
+            queryset = queryset.filter(department_id = department_id)
+
+        return queryset
 
     def email_exists(self, email, exclude_id = None):
         query = self.model.objects.filter(

@@ -59,6 +59,27 @@ def serialize_user(user):
     }
 
 
+# The one authenticated-identity name shown to the client (Navbar, stored
+# localStorage user) - resolved from the linked Student/Teacher profile when
+# one exists, since that profile (not the standalone User.name set at
+# registration) is the maintained source of truth for a Student/Teacher's
+# actual name elsewhere in the app (e.g. GET /students/me/). Only used at
+# login/onboarding, where the client's cached identity is (re)issued -
+# serialize_user itself is left untouched since it's also used by the
+# Admin-facing user list/register/approval responses, which show the
+# registered account name regardless of profile linkage.
+def resolve_authenticated_display_name(user):
+    student = getattr(user, "student_profile", None)
+    if student:
+        return f"{student.first_name} {student.last_name}"
+
+    teacher = getattr(user, "teacher_profile", None)
+    if teacher:
+        return f"{teacher.first_name} {teacher.last_name}"
+
+    return user.name
+
+
 from common.decorators import enforce_permissions
 
 
@@ -139,9 +160,12 @@ def login_api(request):
 
         result = user_service.login(data)
 
+        user_payload = serialize_user(result["user"])
+        user_payload["name"] = resolve_authenticated_display_name(result["user"])
+
         return JsonResponse(
             {
-                "user": serialize_user(result["user"]),
+                "user": user_payload,
                 "access": result["access"],
                 "refresh": result["refresh"],
             }
@@ -333,8 +357,11 @@ def complete_onboarding_api(request):
         with transaction.atomic():
             _create_own_profile(user, data)
 
+        user_payload = serialize_user(user)
+        user_payload["name"] = resolve_authenticated_display_name(user)
+
         return JsonResponse(
-            {"user": serialize_user(user)},
+            {"user": user_payload},
             status = 201,
         )
 

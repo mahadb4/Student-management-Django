@@ -104,7 +104,4 @@ def department_reference_api(request):
         return JsonResponse({"error": Messages.METHOD_NOT_ALLOWED}, status = 405)
 
     departments = department_repository.get_queryset_for_reference()
-    return JsonResponse(
-        [DepartmentMapper.to_reference_dto(department) for department in departments],
-        safe = False,
-    )
+    return paginate_queryset(request, departments, DepartmentMapper.to_reference_dto, default_page_size = 10)

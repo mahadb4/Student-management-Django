@@ -20,4 +20,6 @@ class CourseMapper:
             id = course.id,
             name = course.name,
             code = course.code,
+            department_id = course.department_id,
+            department_name = course.department.name if course.department_id else None,
         ).to_dict()

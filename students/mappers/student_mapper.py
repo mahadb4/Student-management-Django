@@ -21,4 +21,5 @@ class StudentMapper:
             id = student.id,
             name = f"{student.first_name} {student.last_name}",
             student_email = student.student_email,
+            section_id = student.section_id,
         ).to_dict()

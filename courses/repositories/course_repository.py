@@ -24,10 +24,15 @@ class CourseRepository(BaseRepository):
 
         return queryset
 
-    def get_queryset_for_reference(self):
-        return self.model.objects.only(
-            "id", "name", "code",
+    def get_queryset_for_reference(self, department_id = None):
+        queryset = self.model.objects.select_related("department").only(
+            "id", "name", "code", "department_id", "department__name",
         ).order_by("name")
+
+        if department_id is not None:
+            queryset = queryset.filter(department_id = department_id)
+
+        return queryset
 
     def code_exists(self, code, exclude_id = None):
         query = self.model.objects.filter(

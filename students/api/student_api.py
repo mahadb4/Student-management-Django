@@ -117,10 +117,23 @@ def student_reference_api(request):
 
     from common.permissions import apply_data_scope
     students = apply_data_scope(request.user, student_repository.get_queryset_for_reference(), 'student')
-    return JsonResponse(
-        [StudentMapper.to_reference_dto(student) for student in students],
-        safe = False,
-    )
+    return paginate_queryset(request, students, StudentMapper.to_reference_dto, default_page_size = 10)
+
+
+def serialize_student_profile(student):
+    return {
+        "id": student.id,
+        "first_name": student.first_name,
+        "last_name": student.last_name,
+        "student_email": student.student_email,
+        "parents_phone_number": student.parents_phone_number,
+        "date_of_birth": str(student.date_of_birth),
+        "gender": student.gender,
+        "address": student.address,
+        "department_name": student.department.name if student.department_id else None,
+        "section_name": student.section.name if student.section_id else None,
+        "date_of_enrollment": str(student.date_of_enrollment),
+    }
 
 
 def my_profile_api(request):
@@ -136,4 +149,44 @@ def my_profile_api(request):
     if not student:
         return JsonResponse({"error": Messages.STUDENT_NOT_FOUND}, status = 404)
 
-    return JsonResponse(serialize_student(student))
+    return JsonResponse(serialize_student_profile(student))
+
+
+def my_summary_api(request):
+    if request.method != "GET":
+        return JsonResponse({"error": Messages.METHOD_NOT_ALLOWED}, status = 405)
+
+    from common.permissions import authenticate_request
+    user, error = authenticate_request(request)
+    if error:
+        return error
+
+    student = getattr(user, "student_profile", None)
+    if not student:
+        return JsonResponse({"error": Messages.STUDENT_NOT_FOUND}, status = 404)
+
+    from enrollments.models import Enrollment
+    from attendance.models import Attendance
+
+    active_enrollments_count = Enrollment.objects.filter(
+        student = student, is_deleted = False, status = Enrollment.Status.ACTIVE,
+    ).count()
+
+    attendance_qs = Attendance.objects.filter(
+        enrollment__student = student, is_deleted = False,
+    )
+
+    present_count = attendance_qs.filter(status = Attendance.Status.PRESENT).count()
+    absent_count = attendance_qs.filter(status = Attendance.Status.ABSENT).count()
+
+    recent_attendance = [
+        {"id": a.id, "date": str(a.date), "status": a.status}
+        for a in attendance_qs.order_by("-date", "-id")[:3]
+    ]
+
+    return JsonResponse({
+        "active_enrollments_count": active_enrollments_count,
+        "present_count": present_count,
+        "absent_count": absent_count,
+        "recent_attendance": recent_attendance,
+    })

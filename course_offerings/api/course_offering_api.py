@@ -49,7 +49,19 @@ def course_offering_api(request, offering_id = None):
                 return JsonResponse(serialize_course_offering(offering))
 
             search = request.GET.get("search", "").strip() or None
-            offerings = apply_data_scope(request.user, course_offering_repository.get_queryset_for_list(search = search), 'courseoffering')
+
+            # Optional dependent-dropdown filter: when a student is selected in
+            # the Admin Enrollment form, only offerings matching that student's
+            # own section should be selectable. Absent -> unfiltered (existing
+            # behavior unchanged).
+            section_id_param = request.GET.get("section_id", "").strip()
+            section_id = int(section_id_param) if section_id_param.isdigit() else None
+
+            offerings = apply_data_scope(
+                request.user,
+                course_offering_repository.get_queryset_for_list(search = search, section_id = section_id),
+                'courseoffering',
+            )
             return paginate_queryset(request, offerings, CourseOfferingMapper.to_list_dto)
 
         if request.method == "POST":
@@ -107,6 +119,20 @@ def course_offering_api(request, offering_id = None):
         return JsonResponse({"error": str(e)}, status = 400)
 
 
+@csrf_exempt
+@enforce_permissions('course_offerings', 'courseoffering')
+def course_offering_reference_api(request):
+    if request.method != "GET":
+        return JsonResponse({"error": Messages.METHOD_NOT_ALLOWED}, status = 405)
+
+    from common.permissions import apply_data_scope
+    search = request.GET.get("search", "").strip() or None
+    # Same scoping as the full list endpoint above - this is a field
+    # projection, not a different visibility rule.
+    offerings = apply_data_scope(request.user, course_offering_repository.get_queryset_for_list(search = search), 'courseoffering')
+    return paginate_queryset(request, offerings, CourseOfferingMapper.to_reference_dto, default_page_size = 10)
+
+
 def my_course_offerings_api(request):
     if request.method != "GET":
         return JsonResponse({"error": Messages.METHOD_NOT_ALLOWED}, status = 405)
@@ -120,5 +146,5 @@ def my_course_offerings_api(request):
     if not teacher:
         return JsonResponse({"error": Messages.TEACHER_NOT_FOUND}, status = 404)
 
-    qs = course_offering_repository.get_queryset_for_list().filter(teacher_id = teacher.id, is_deleted = False)
-    return paginate_queryset(request, qs, CourseOfferingMapper.to_list_dto)
+    qs = course_offering_repository.get_queryset_for_teacher_list(teacher.id)
+    return paginate_queryset(request, qs, CourseOfferingMapper.to_teacher_list_dto, default_page_size = 10)

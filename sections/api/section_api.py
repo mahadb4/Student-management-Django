@@ -106,7 +106,4 @@ def section_reference_api(request):
 
     department_id = request.GET.get("department_id") or None
     sections = section_repository.get_queryset_for_reference(department_id = department_id)
-    return JsonResponse(
-        [SectionMapper.to_reference_dto(section) for section in sections],
-        safe = False,
-    )
+    return paginate_queryset(request, sections, SectionMapper.to_reference_dto, default_page_size = 10)

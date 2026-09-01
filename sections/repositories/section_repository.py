@@ -23,8 +23,8 @@ class SectionRepository(BaseRepository):
         return queryset
 
     def get_queryset_for_reference(self, department_id = None):
-        queryset = self.model.objects.filter(is_deleted = False).only(
-            "id", "name", "department_id",
+        queryset = self.model.objects.filter(is_deleted = False).select_related("department").only(
+            "id", "name", "department_id", "department__name",
         ).order_by("name")
 
         if department_id is not None:
