@@ -116,9 +116,9 @@ def attendance_api(request, attendance_id = None):
 
 
 def my_attendance_api(request):
-    # Serves both /students/me/attendance/ and /teachers/me/attendance/ -
-    # apply_data_scope's 'attendance' branch already scopes correctly for
-    # whichever role request.user turns out to be, so one view covers both.
+    # Serves /teachers/me/attendance/ - apply_data_scope's 'attendance' branch
+    # scopes to the teacher's own classes. (Students use my_student_attendance_api
+    # below, which returns a narrower, student-specific projection.)
     if request.method != "GET":
         return JsonResponse({"error": Messages.METHOD_NOT_ALLOWED}, status = 405)
 
@@ -128,4 +128,22 @@ def my_attendance_api(request):
         return error
 
     qs = apply_data_scope(user, attendance_repository.get_queryset_for_list(), 'attendance')
-    return paginate_queryset(request, qs, AttendanceMapper.to_list_dto)
+    return paginate_queryset(request, qs, AttendanceMapper.to_teacher_list_dto, default_page_size = 10)
+
+
+def my_student_attendance_api(request):
+    # Serves /students/me/attendance/ - returns only the fields the Student
+    # Attendance UI uses (no student_id/student_name/course_id, which are
+    # redundant echoes of the caller's own identity). Paginated at the
+    # project-standard default_page_size = 10 since attendance history grows
+    # without bound over a student's enrollment.
+    if request.method != "GET":
+        return JsonResponse({"error": Messages.METHOD_NOT_ALLOWED}, status = 405)
+
+    from common.permissions import authenticate_request, apply_data_scope
+    user, error = authenticate_request(request)
+    if error:
+        return error
+
+    qs = apply_data_scope(user, attendance_repository.get_queryset_for_list(), 'attendance')
+    return paginate_queryset(request, qs, AttendanceMapper.to_student_list_dto, default_page_size = 10)

@@ -8,12 +8,15 @@ class EnrollmentRepository(BaseRepository):
         super().__init__(Enrollment)
 
     def get_queryset_for_list(self, search = None):
-        queryset = self.model.objects.select_related("student", "course_offering__course", "course_offering__section").only(
+        queryset = self.model.objects.select_related(
+            "student", "course_offering__course", "course_offering__section", "course_offering__teacher",
+        ).only(
             "id", "status",
             "student__id", "student__first_name", "student__last_name", "student__student_email",
             "course_offering__id", "course_offering__semester", "course_offering__academic_year",
             "course_offering__course__id", "course_offering__course__name", "course_offering__course__code",
             "course_offering__section__id", "course_offering__section__name",
+            "course_offering__teacher__id", "course_offering__teacher__first_name", "course_offering__teacher__last_name",
         ).order_by("id")
 
         if search:

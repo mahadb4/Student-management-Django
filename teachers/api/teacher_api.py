@@ -14,6 +14,18 @@ teacher_service = TeacherService(teacher_validator, teacher_repository)
 
 from common.utils import paginate_queryset
 
+def serialize_teacher_profile(teacher):
+    return {
+        "id": teacher.id,
+        "first_name": teacher.first_name,
+        "last_name": teacher.last_name,
+        "employee_id": teacher.employee_id,
+        "email": teacher.email,
+        "department_name": teacher.department.name if teacher.department_id else None,
+        "designation": teacher.designation,
+    }
+
+
 def serialize_teacher(teacher):
     return {
         "id": teacher.id,
@@ -105,11 +117,9 @@ def teacher_reference_api(request):
         return JsonResponse({"error": Messages.METHOD_NOT_ALLOWED}, status = 405)
 
     from common.permissions import apply_data_scope
-    teachers = apply_data_scope(request.user, teacher_repository.get_queryset_for_reference(), 'teacher')
-    return JsonResponse(
-        [TeacherMapper.to_reference_dto(teacher) for teacher in teachers],
-        safe = False,
-    )
+    department_id = request.GET.get("department_id") or None
+    teachers = apply_data_scope(request.user, teacher_repository.get_queryset_for_reference(department_id = department_id), 'teacher')
+    return paginate_queryset(request, teachers, TeacherMapper.to_reference_dto, default_page_size = 10)
 
 
 def my_profile_api(request):
@@ -125,23 +135,68 @@ def my_profile_api(request):
     if not teacher:
         return JsonResponse({"error": Messages.TEACHER_NOT_FOUND}, status = 404)
 
-    return JsonResponse(serialize_teacher(teacher))
+    return JsonResponse(serialize_teacher_profile(teacher))
 
 
 def my_students_api(request):
+    # Returns one row per enrollment (student + which of the teacher's own
+    # classes/section they're in), which is what the Teacher Students page
+    # actually renders - not bare Student records with no class context.
     if request.method != "GET":
         return JsonResponse({"error": Messages.METHOD_NOT_ALLOWED}, status = 405)
 
     from common.permissions import authenticate_request, apply_data_scope
-    from students.repositories.student_repository import StudentRepository
-    from students.mappers.student_mapper import StudentMapper
+    from enrollments.repositories.enrollment_repository import EnrollmentRepository
+    from enrollments.mappers.enrollment_mapper import EnrollmentMapper
 
     user, error = authenticate_request(request)
     if error:
         return error
 
-    # Reuses apply_data_scope's existing teacher branch for 'student': students
-    # enrolled in this teacher's own course offerings - the same scoping rule
-    # already used by the general /students/ list, just resolved for `me`.
-    qs = apply_data_scope(user, StudentRepository().get_queryset_for_list(), 'student')
-    return paginate_queryset(request, qs, StudentMapper.to_list_dto)
+    # Reuses apply_data_scope's existing teacher branch for 'enrollment':
+    # enrollments in this teacher's own course offerings - the same scoping
+    # rule already used by the general /enrollments/ list, just resolved for `me`.
+    qs = apply_data_scope(user, EnrollmentRepository().get_queryset_for_list(), 'enrollment')
+
+    # Optional: scope down to one class's roster (e.g. for marking attendance,
+    # where every student in the selected class must be selectable, not just
+    # whichever page of the teacher's full cross-class enrollment list happens
+    # to be loaded).
+    course_offering_id = request.GET.get("course_offering_id")
+    if course_offering_id:
+        qs = qs.filter(course_offering_id = course_offering_id)
+
+    return paginate_queryset(request, qs, EnrollmentMapper.to_teacher_list_dto, default_page_size = 10)
+
+
+def my_dashboard_api(request):
+    if request.method != "GET":
+        return JsonResponse({"error": Messages.METHOD_NOT_ALLOWED}, status = 405)
+
+    from common.permissions import authenticate_request
+    user, error = authenticate_request(request)
+    if error:
+        return error
+
+    teacher = getattr(user, "teacher_profile", None)
+    if not teacher:
+        return JsonResponse({"error": Messages.TEACHER_NOT_FOUND}, status = 404)
+
+    from course_offerings.models import CourseOffering
+    from enrollments.models import Enrollment
+
+    active_classes = CourseOffering.objects.filter(
+        teacher_id = teacher.id, is_deleted = False, is_active = True,
+    ).count()
+
+    total_students = Enrollment.objects.filter(
+        course_offering__teacher_id = teacher.id,
+        course_offering__is_deleted = False,
+        is_deleted = False,
+        status = Enrollment.Status.ACTIVE,
+    ).values("student_id").distinct().count()
+
+    return JsonResponse({
+        "active_classes": active_classes,
+        "total_students": total_students,
+    })
