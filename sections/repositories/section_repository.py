@@ -22,13 +22,19 @@ class SectionRepository(BaseRepository):
 
         return queryset
 
-    def get_queryset_for_reference(self, department_id = None):
+    def get_queryset_for_reference(self, department_id = None, semester_number = None, academic_year = None):
         queryset = self.model.objects.filter(is_deleted = False).select_related("department").only(
-            "id", "name", "department_id", "department__name",
+            "id", "name", "semester_number", "department_id", "department__name",
         ).order_by("name")
 
         if department_id is not None:
             queryset = queryset.filter(department_id = department_id)
+
+        if semester_number is not None:
+            queryset = queryset.filter(semester_number = semester_number)
+
+        if academic_year is not None:
+            queryset = queryset.filter(academic_year = academic_year)
 
         return queryset
 

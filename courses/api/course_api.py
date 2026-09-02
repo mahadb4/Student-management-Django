@@ -23,6 +23,7 @@ def serialize_course(course):
         "code": course.code,
         "description": course.description,
         "credits": course.credits,
+        "semester_number": course.semester_number,
         "department": course.department_id,
         "teacher": course.teacher_id,
         "is_active": course.is_active,
@@ -105,5 +106,6 @@ def course_reference_api(request):
         return JsonResponse({"error": Messages.METHOD_NOT_ALLOWED}, status = 405)
 
     department_id = request.GET.get("department_id") or None
-    courses = course_repository.get_queryset_for_reference(department_id = department_id)
+    semester_number = request.GET.get("semester_number") or None
+    courses = course_repository.get_queryset_for_reference(department_id = department_id, semester_number = semester_number)
     return paginate_queryset(request, courses, CourseMapper.to_reference_dto, default_page_size = 10)
