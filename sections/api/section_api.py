@@ -105,5 +105,7 @@ def section_reference_api(request):
         return JsonResponse({"error": Messages.METHOD_NOT_ALLOWED}, status = 405)
 
     department_id = request.GET.get("department_id") or None
-    sections = section_repository.get_queryset_for_reference(department_id = department_id)
+    semester_number = request.GET.get("semester_number") or None
+    academic_year = request.GET.get("academic_year") or None
+    sections = section_repository.get_queryset_for_reference(department_id = department_id, semester_number = semester_number, academic_year = academic_year)
     return paginate_queryset(request, sections, SectionMapper.to_reference_dto, default_page_size = 10)

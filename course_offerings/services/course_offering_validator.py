@@ -22,14 +22,19 @@ class CourseOfferingValidator:
         academic_year = data["academic_year"]
         section_id = data["section"]
 
-        if not Course.objects.filter(id = course_id, is_active = True).exists():
+        course = Course.objects.filter(id = course_id, is_active = True).first()
+        if not course:
             raise ValueError(Messages.INVALID_COURSE.format(course_id))
 
         if not Teacher.objects.filter(id = teacher_id, is_active = True).exists():
             raise ValueError(Messages.INVALID_TEACHER.format(teacher_id))
 
-        if not Section.objects.filter(id = section_id, is_deleted = False, is_active = True).exists():
+        section = Section.objects.filter(id = section_id, is_deleted = False, is_active = True).first()
+        if not section:
             raise ValueError(Messages.INVALID_SECTION.format(section_id))
+
+        if course.semester_number is not None and course.semester_number != section.semester_number:
+            raise ValueError(Messages.COURSE_SECTION_SEMESTER_MISMATCH.format(course.semester_number, section.semester_number))
 
         if semester not in CourseOffering.Semester.values:
             raise ValueError(Messages.INVALID_SEMESTER.format(semester))

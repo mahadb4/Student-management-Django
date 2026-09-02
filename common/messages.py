@@ -119,6 +119,7 @@ class Messages:
     INVALID_STUDENT = "Invalid student with ID {}."
     INVALID_ENROLLMENT = "Invalid enrollment with ID {}."
     INVALID_SEMESTER = "Invalid semester '{}'."
+    INVALID_SEMESTER_NUMBER = "Invalid semester number '{}'. Must be between 1 and 8."
     INVALID_SECTION = "Invalid section with ID {}."
 
     # ── Validation — Uniqueness ───────────────────────────────────────────────
@@ -153,6 +154,8 @@ class Messages:
     ENROLLMENT_SECTION_MISMATCH = "Student can only be enrolled in a course offering for their own section."
     STUDENT_INACTIVE = "Inactive student cannot be enrolled."
     COURSE_OFFERING_INACTIVE = "Inactive course offering cannot be used for enrollment."
+
+    COURSE_SECTION_SEMESTER_MISMATCH = "Course is designed for semester {} but the selected section is semester {}."
 
 
     ATTENDANCE_UPDATED = "Attendance updated successfully."

@@ -10,6 +10,7 @@ class CourseMapper:
             code = course.code,
             name = course.name,
             credits = course.credits,
+            semester_number = course.semester_number,
             department_name = course.department.name if course.department_id else None,
             teacher_name = f"{course.teacher.first_name} {course.teacher.last_name}" if course.teacher_id else None,
         ).to_dict()
@@ -20,6 +21,7 @@ class CourseMapper:
             id = course.id,
             name = course.name,
             code = course.code,
+            semester_number = course.semester_number,
             department_id = course.department_id,
             department_name = course.department.name if course.department_id else None,
         ).to_dict()

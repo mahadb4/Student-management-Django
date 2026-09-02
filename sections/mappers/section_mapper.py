@@ -20,5 +20,6 @@ class SectionMapper:
         return SectionReferenceDTO(
             id = section.id,
             name = section.name,
+            semester_number = section.semester_number,
             department_name = section.department.name if section.department_id else None,
         ).to_dict()

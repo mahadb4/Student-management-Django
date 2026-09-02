@@ -62,7 +62,6 @@ def apply_data_scope(user, queryset, model_type):
         if user_teacher:
             return queryset.filter(id = user_teacher.id)
 
-
         #The student can see teachers connected to their enrolled courses
         if user_student:
             return queryset.filter(

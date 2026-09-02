@@ -9,7 +9,7 @@ class CourseRepository(BaseRepository):
 
     def get_queryset_for_list(self, search = None):
         queryset = self.model.objects.select_related("department", "teacher").only(
-            "id", "code", "name", "credits",
+            "id", "code", "name", "credits", "semester_number",
             "department__id", "department__name",
             "teacher__id", "teacher__first_name", "teacher__last_name",
         ).order_by("id")
@@ -24,13 +24,16 @@ class CourseRepository(BaseRepository):
 
         return queryset
 
-    def get_queryset_for_reference(self, department_id = None):
+    def get_queryset_for_reference(self, department_id = None, semester_number = None):
         queryset = self.model.objects.select_related("department").only(
-            "id", "name", "code", "department_id", "department__name",
+            "id", "name", "code", "semester_number", "department_id", "department__name",
         ).order_by("name")
 
         if department_id is not None:
             queryset = queryset.filter(department_id = department_id)
+
+        if semester_number is not None:
+            queryset = queryset.filter(semester_number = semester_number)
 
         return queryset
 
@@ -60,6 +63,7 @@ class CourseRepository(BaseRepository):
         course.code = data["code"].strip()
         course.description = (data.get("description") or "").strip()
         course.credits = data["credits"]
+        course.semester_number = data.get("semester_number") or None
         course.department_id = data["department"]
         course.teacher_id = data.get("teacher")
         course.is_active = data.get("is_active", True) in (True, "on", "true", "True")

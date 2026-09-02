@@ -22,6 +22,11 @@ class CourseValidator:
         CommonValidator.validate_length(code, 20, "Course code")
         CommonValidator.validate_positive_number(credits, "Credits")
 
+        semester_number = data.get("semester_number")
+        if semester_number not in (None, ""):
+            if not isinstance(semester_number, int) or not (1 <= semester_number <= 8):
+                raise ValueError(Messages.INVALID_SEMESTER_NUMBER.format(semester_number))
+
         if not Department.objects.filter(id = department_id, is_active = True).exists():
             raise ValueError(Messages.INVALID_DEPARTMENT.format(department_id))
 
