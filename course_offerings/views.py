@@ -1,4 +1,6 @@
 from django.shortcuts import get_object_or_404, redirect, render
+from common.cache.cache_service import CacheService
+from course_offerings.cache.course_offering_cache import CourseOfferingCache
 from course_offerings.models import CourseOffering
 from course_offerings.repositories.course_offering_repository import CourseOfferingRepository
 from course_offerings.services.course_offering_service import CourseOfferingService
@@ -8,7 +10,8 @@ from teachers.models import Teacher
 
 course_offering_validator = CourseOfferingValidator()
 course_offering_repository = CourseOfferingRepository()
-course_offering_service = CourseOfferingService(course_offering_validator, course_offering_repository)
+course_offering_cache = CourseOfferingCache(CacheService())
+course_offering_service = CourseOfferingService(course_offering_validator, course_offering_repository, course_offering_cache)
 
 
 def course_offering_list_view(request):

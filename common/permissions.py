@@ -24,21 +24,47 @@ def authenticate_request(request):
     return user, None
 
 
+#Returns WHO the viewer is for data-scoping purposes, independent of model_type.
+#Every branch of apply_data_scope() picks the viewer identity in exactly this way
+#(teacher profile wins over student profile); only the filter expression differs.
+#Cache layers key on this so cached data can never leak across permission scopes.
+#Returns (kind, profile) where kind is "anon" | "all" | "teacher" | "student" | "none".
+def get_scope_identity(user):
+    if not user.is_authenticated:
+        return "anon", None
+
+    if user.is_superuser:
+        return "all", None
+
+    user_teacher = _get_profile(user, "teacher_profile")
+    if user_teacher:
+        return "teacher", user_teacher
+
+    user_student = _get_profile(user, "student_profile")
+    if user_student:
+        return "student", user_student
+
+    return "none", None
+
+
 def apply_data_scope(user, queryset, model_type):
 
     #queryset.model means the Django model behind the queryset
     if hasattr(queryset.model, "is_deleted"):
         queryset = queryset.filter(is_deleted = False)
 
-    if not user.is_authenticated:
+    #Single source of truth for viewer identity, shared with the cache layer.
+    kind, profile = get_scope_identity(user)
+
+    if kind == "anon":
         return queryset.none()
 
     #for admin, No teacher/student restrictions are applied.
-    if user.is_superuser:
+    if kind == "all":
         return queryset
 
-    user_student = _get_profile(user, "student_profile")
-    user_teacher = _get_profile(user, "teacher_profile")
+    user_teacher = profile if kind == "teacher" else None
+    user_student = profile if kind == "student" else None
 
     if model_type == "student":
         if user_teacher:

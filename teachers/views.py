@@ -1,5 +1,7 @@
 from django.shortcuts import get_object_or_404, redirect, render
+from common.cache.cache_service import CacheService
 from departments.models import Department
+from teachers.cache.teacher_cache import TeacherCache
 from teachers.models import Teacher
 from teachers.repositories.teacher_repository import TeacherRepository
 from teachers.services.teacher_service import TeacherService
@@ -7,7 +9,8 @@ from teachers.services.teacher_validator import TeacherValidator
 
 teacher_validator = TeacherValidator()
 teacher_repository = TeacherRepository()
-teacher_service = TeacherService(teacher_validator, teacher_repository)
+teacher_cache = TeacherCache(CacheService())
+teacher_service = TeacherService(teacher_validator, teacher_repository, teacher_cache)
 
 
 def teacher_list_view(request):

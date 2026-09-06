@@ -40,11 +40,15 @@ def admin_summary(request):
     from course_offerings.models import CourseOffering
     from enrollments.models import Enrollment
 
+    # Soft-deleted rows must not be counted - they are hidden from every list
+    # endpoint, so counting them reported totals the admin could never reconcile
+    # against the pages themselves. Course has no is_deleted field (it hard
+    # deletes), so its count is unfiltered.
     return JsonResponse({
-        "total_students": Student.objects.count(),
-        "total_teachers": Teacher.objects.count(),
-        "total_departments": Department.objects.count(),
+        "total_students": Student.objects.filter(is_deleted = False).count(),
+        "total_teachers": Teacher.objects.filter(is_deleted = False).count(),
+        "total_departments": Department.objects.filter(is_deleted = False).count(),
         "total_courses": Course.objects.count(),
-        "total_course_offerings": CourseOffering.objects.count(),
-        "total_enrollments": Enrollment.objects.count(),
+        "total_course_offerings": CourseOffering.objects.filter(is_deleted = False).count(),
+        "total_enrollments": Enrollment.objects.filter(is_deleted = False).count(),
     })

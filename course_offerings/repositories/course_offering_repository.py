@@ -53,6 +53,25 @@ class CourseOfferingRepository(BaseRepository):
 
         return queryset
 
+    def get_queryset_for_discovery(self, section_id, search = None):
+        # Offerings a student could browse and enrol in. Deliberately NOT narrowed
+        # by apply_data_scope's 'courseoffering' student branch, which restricts to
+        # offerings the student is ALREADY enrolled in - correct for reading their
+        # own data, but it made the "Available Offerings" tab permanently empty.
+        #
+        # The narrowing here is an EXACT section match, mirroring
+        # enrollment_service._validate_student_section's
+        # `student.section_id != course_offering.section_id` comparison - including
+        # section_id = None, where only section-less offerings match. It embeds no
+        # rule of its own; enrolment itself is still authorised by that validator.
+        #
+        # is_deleted is filtered explicitly because this path bypasses
+        # apply_data_scope, which is what normally supplies that filter.
+        return self.get_queryset_for_list(search = search).filter(
+            is_deleted = False,
+            section_id = section_id,
+        )
+
     def course_offering_exists(self,course_id,teacher_id,semester,academic_year,section_id,exclude_id = None):
         query = self.model.objects.filter(
             course_id = course_id,

@@ -2,7 +2,9 @@ import json
 from django.db.models.deletion import ProtectedError
 from django.http import HttpResponse, JsonResponse
 from django.views.decorators.csrf import csrf_exempt
+from common.cache.cache_service import CacheService
 from common.messages import Messages
+from course_offerings.cache.course_offering_cache import CourseOfferingCache
 from course_offerings.models import CourseOffering
 from course_offerings.repositories.course_offering_repository import CourseOfferingRepository
 from course_offerings.services.course_offering_service import CourseOfferingService
@@ -10,9 +12,10 @@ from course_offerings.services.course_offering_validator import CourseOfferingVa
 
 course_offering_validator = CourseOfferingValidator()
 course_offering_repository = CourseOfferingRepository()
-course_offering_service = CourseOfferingService(course_offering_validator, course_offering_repository)
+course_offering_cache = CourseOfferingCache(CacheService())
+course_offering_service = CourseOfferingService(course_offering_validator, course_offering_repository, course_offering_cache)
 
-from common.utils import paginate_queryset
+from common.utils import paginate_queryset, resolve_pagination_params
 
 
 def serialize_course_offering(offering):
@@ -57,12 +60,14 @@ def course_offering_api(request, offering_id = None):
             section_id_param = request.GET.get("section_id", "").strip()
             section_id = int(section_id_param) if section_id_param.isdigit() else None
 
-            offerings = apply_data_scope(
-                request.user,
-                course_offering_repository.get_queryset_for_list(search = search, section_id = section_id),
-                'courseoffering',
+            #Normalize paging before it reaches the cache key. Scope filtering,
+            #pagination and DTO mapping happen inside the service.
+            page_number, page_size = resolve_pagination_params(request)
+            return JsonResponse(
+                course_offering_service.get_list(
+                    request.user, search, section_id, page_number, page_size,
+                )
             )
-            return paginate_queryset(request, offerings, CourseOfferingMapper.to_list_dto)
 
         if request.method == "POST":
             data = json.loads(request.body)
@@ -125,12 +130,22 @@ def course_offering_reference_api(request):
     if request.method != "GET":
         return JsonResponse({"error": Messages.METHOD_NOT_ALLOWED}, status = 405)
 
-    from common.permissions import apply_data_scope
     search = request.GET.get("search", "").strip() or None
-    # Same scoping as the full list endpoint above - this is a field
-    # projection, not a different visibility rule.
-    offerings = apply_data_scope(request.user, course_offering_repository.get_queryset_for_list(search = search), 'courseoffering')
-    return paginate_queryset(request, offerings, CourseOfferingMapper.to_reference_dto, default_page_size = 10)
+
+    # Admins and teachers keep their normal data scope here. Students get
+    # section-matched DISCOVERY instead of their enrolment-based scope, which
+    # otherwise made the "Available Offerings" tab permanently empty (it returned
+    # only offerings they were already enrolled in, which the frontend then
+    # subtracted). Enrolment authorisation is unchanged - it is enforced by
+    # enrollment_service._validate_student_section on POST. See
+    # CourseOfferingService.get_reference_list().
+    page_number, page_size = resolve_pagination_params(request, default_page_size = 10)
+
+    return JsonResponse(
+        course_offering_service.get_reference_list(
+            request.user, search, page_number, page_size,
+        )
+    )
 
 
 def my_course_offerings_api(request):

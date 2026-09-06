@@ -3,7 +3,9 @@ import json
 from django.db.models.deletion import ProtectedError
 from django.http import HttpResponse, JsonResponse
 from django.views.decorators.csrf import csrf_exempt
+from common.cache.cache_service import CacheService
 from common.messages import Messages
+from courses.cache.course_cache import CourseCache
 from courses.models import Course
 from courses.repositories.course_repository import CourseRepository
 from courses.services.course_service import CourseService
@@ -11,9 +13,10 @@ from courses.services.course_validator import CourseValidator
 
 course_validator = CourseValidator()
 course_repository = CourseRepository()
-course_service = CourseService(course_validator, course_repository)
+course_cache = CourseCache(CacheService())
+course_service = CourseService(course_validator, course_repository, course_cache)
 
-from common.utils import paginate_queryset
+from common.utils import paginate_queryset, resolve_pagination_params
 from courses.mappers.course_mapper import CourseMapper
 
 def serialize_course(course):
@@ -41,8 +44,11 @@ def course_api(request, course_id = None):
                 return JsonResponse(serialize_course(course))
 
             search = request.GET.get("search", "").strip() or None
-            courses = course_repository.get_queryset_for_list(search = search)
-            return paginate_queryset(request, courses, CourseMapper.to_list_dto)
+            #Normalize paging before it reaches the cache key.
+            page_number, page_size = resolve_pagination_params(request)
+            return JsonResponse(
+                course_service.get_list(request.user, search, page_number, page_size)
+            )
 
         if request.method == "POST":
             data = json.loads(request.body)
@@ -105,7 +111,15 @@ def course_reference_api(request):
     if request.method != "GET":
         return JsonResponse({"error": Messages.METHOD_NOT_ALLOWED}, status = 405)
 
+    #"" -> None BEFORE these reach the cache key, so requests selecting the same
+    #rows share one entry.
     department_id = request.GET.get("department_id") or None
     semester_number = request.GET.get("semester_number") or None
-    courses = course_repository.get_queryset_for_reference(department_id = department_id, semester_number = semester_number)
-    return paginate_queryset(request, courses, CourseMapper.to_reference_dto, default_page_size = 10)
+
+    page_number, page_size = resolve_pagination_params(request, default_page_size = 10)
+
+    return JsonResponse(
+        course_service.get_reference_list(
+            request.user, department_id, semester_number, page_number, page_size,
+        )
+    )
