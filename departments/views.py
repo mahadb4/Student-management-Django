@@ -1,4 +1,6 @@
 from django.shortcuts import get_object_or_404, redirect, render
+from common.cache.cache_service import CacheService
+from departments.cache.department_cache import DepartmentCache
 from departments.models import Department
 from departments.repositories.department_repository import DepartmentRepository
 from departments.services.department_service import DepartmentService
@@ -6,7 +8,8 @@ from departments.services.department_validator import DepartmentValidator
 
 department_validator = DepartmentValidator()
 department_repository = DepartmentRepository()
-department_service = DepartmentService(department_validator, department_repository)
+department_cache = DepartmentCache(CacheService())
+department_service = DepartmentService(department_validator, department_repository, department_cache)
 
 
 def department_list_view(request):

@@ -1,14 +1,35 @@
 from common.messages import Messages
+from common.permissions import apply_data_scope
+from common.utils import build_paginated_payload
+from enrollments.mappers.enrollment_mapper import EnrollmentMapper
 
 
 class EnrollmentService:
-    def __init__(self,validator,repository):
+    #cache is an EnrollmentCache (enrollments/cache/enrollment_cache.py).
+    def __init__(self,validator,repository,cache):
         self.validator = validator
         self.repository = repository
+        self.cache = cache
 
+    #Not cached: the React admin page edits from the list row and never calls
+    #the detail endpoint.
     def get(self,enrollment_id):
         return self.repository.get(enrollment_id)
 
+    #GET /api/enrollments/?page=&page_size=&search=
+    #Scoped per user: admin sees all, a teacher those in their own offerings,
+    #a student their own.
+    def get_list(self,user,search,page,page_size):
+        scope_token = self.cache.scope_token_for(user)
+
+        def loader():
+            queryset = self.repository.get_queryset_for_list(search = search)
+            queryset = apply_data_scope(user,queryset,'enrollment')
+            return build_paginated_payload(queryset,page,page_size,EnrollmentMapper.to_list_dto)
+
+        return self.cache.get_or_load_list(scope_token,search,page,page_size,loader)
+
+    #Used only by the legacy server-rendered template view.
     def get_all(self):
         return self.repository.get_all()
 
@@ -25,7 +46,9 @@ class EnrollmentService:
         if self.repository.enrollment_exists(student_id,course_offering_id):
             raise ValueError(Messages.ENROLLMENT_ALREADY_EXISTS.format(student_id,course_offering_id))
 
-        return self.repository.create(data)
+        result = self.repository.create(data)
+        self.cache.invalidate_on_write()
+        return result
 
     def update(self,enrollment_id,data,partial = False):
         enrollment = self.repository.get(enrollment_id)
@@ -45,10 +68,13 @@ class EnrollmentService:
         if self.repository.enrollment_exists(student_id,course_offering_id,enrollment_id):
             raise ValueError(Messages.ENROLLMENT_ALREADY_EXISTS.format(student_id,course_offering_id))
 
-        return self.repository.update(enrollment,data)
+        result = self.repository.update(enrollment,data)
+        self.cache.invalidate_on_write()
+        return result
 
     def delete(self,enrollment_id):
         self.repository.delete(enrollment_id)
+        self.cache.invalidate_on_write()
 
     def _validate_student_section(self,student_id,course_offering_id):
         from students.models import Student

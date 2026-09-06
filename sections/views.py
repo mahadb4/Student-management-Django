@@ -1,4 +1,6 @@
 from django.shortcuts import get_object_or_404, redirect, render
+from common.cache.cache_service import CacheService
+from sections.cache.section_cache import SectionCache
 from sections.models import Section
 from sections.repositories.section_repository import SectionRepository
 from sections.services.section_service import SectionService
@@ -6,7 +8,8 @@ from sections.services.section_validator import SectionValidator
 
 section_validator = SectionValidator()
 section_repository = SectionRepository()
-section_service = SectionService(section_validator, section_repository)
+section_cache = SectionCache(CacheService())
+section_service = SectionService(section_validator, section_repository, section_cache)
 
 
 def section_list_view(request):

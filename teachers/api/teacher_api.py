@@ -2,7 +2,9 @@ import json
 from django.db.models.deletion import ProtectedError
 from django.http import HttpResponse, JsonResponse
 from django.views.decorators.csrf import csrf_exempt
+from common.cache.cache_service import CacheService
 from common.messages import Messages
+from teachers.cache.teacher_cache import TeacherCache
 from teachers.models import Teacher
 from teachers.repositories.teacher_repository import TeacherRepository
 from teachers.services.teacher_service import TeacherService
@@ -10,9 +12,10 @@ from teachers.services.teacher_validator import TeacherValidator
 
 teacher_validator = TeacherValidator()
 teacher_repository = TeacherRepository()
-teacher_service = TeacherService(teacher_validator, teacher_repository)
+teacher_cache = TeacherCache(CacheService())
+teacher_service = TeacherService(teacher_validator, teacher_repository, teacher_cache)
 
-from common.utils import paginate_queryset
+from common.utils import paginate_queryset, resolve_pagination_params
 
 def serialize_teacher_profile(teacher):
     return {
@@ -67,8 +70,13 @@ def teacher_api(request, teacher_id = None):
                 return JsonResponse(serialize_teacher(teacher))
 
             search = request.GET.get("search", "").strip() or None
-            list_qs = apply_data_scope(request.user, teacher_repository.get_queryset_for_list(search = search), 'teacher')
-            return paginate_queryset(request, list_qs, TeacherMapper.to_list_dto)
+            #Normalize paging first so the cache key reflects the effective page,
+            #not the raw query string. Scope filtering, pagination and DTO mapping
+            #all happen inside the service, behind the Redis list cache.
+            page_number, page_size = resolve_pagination_params(request)
+            return JsonResponse(
+                teacher_service.get_list(request.user, search, page_number, page_size)
+            )
 
         if request.method == "POST":
             teacher = teacher_service.create(json.loads(request.body))

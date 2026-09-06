@@ -1,15 +1,49 @@
 ﻿from common.messages import Messages
+from common.utils import build_paginated_payload
+from courses.mappers.course_mapper import CourseMapper
 from courses.services.course_validator import CourseValidator
 
 
 class CourseService:
-    def __init__(self, validator, repository):
+    #cache is a CourseCache (courses/cache/course_cache.py).
+    def __init__(self, validator, repository, cache):
         self.validator = validator
         self.repository = repository
+        self.cache = cache
 
+    #Cached: the React admin page fetches the full record to populate its edit form.
     def get(self, course_id):
-        return self.repository.get(course_id)
+        return self.cache.get_or_load_detail(course_id, lambda: self.repository.get(course_id))
 
+    #GET /api/courses/?page=&page_size=&search=
+    #page/page_size must already be normalized (common.utils.resolve_pagination_params).
+    def get_list(self, user, search, page, page_size):
+        scope_token = self.cache.scope_token_for(user)
+
+        def loader():
+            queryset = self.repository.get_queryset_for_list(search = search)
+            return build_paginated_payload(queryset, page, page_size, CourseMapper.to_list_dto)
+
+        return self.cache.get_or_load_list(scope_token, search, page, page_size, loader)
+
+    #GET /api/courses/reference/ - dropdown projection, narrowed by department
+    #and/or program semester. Values must arrive already normalized ("" -> None).
+    def get_reference_list(self, user, department_id, semester_number, page, page_size):
+        scope_token = self.cache.scope_token_for(user)
+        filters = self.cache.reference_filters(department_id, semester_number)
+
+        def loader():
+            queryset = self.repository.get_queryset_for_reference(
+                department_id = department_id,
+                semester_number = semester_number,
+            )
+            return build_paginated_payload(queryset, page, page_size, CourseMapper.to_reference_dto)
+
+        return self.cache.get_or_load_list(
+            scope_token, None, page, page_size, loader, filters = filters,
+        )
+
+    #Used only by the legacy server-rendered template view (courses/views.py).
     def get_all(self):
         return self.repository.get_all()
 
@@ -24,7 +58,9 @@ class CourseService:
         if self.repository.code_exists(code):
             raise ValueError(Messages.COURSE_CODE_EXISTS.format(code))
 
-        return self.repository.create(data)
+        result = self.repository.create(data)
+        self.cache.invalidate_on_write()
+        return result
 
     def update(self, course_id, data, partial = False):
         course = self.repository.get(course_id)
@@ -42,10 +78,13 @@ class CourseService:
         if self.repository.code_exists(code, course_id):
             raise ValueError(Messages.COURSE_CODE_EXISTS.format(code))
 
-        return self.repository.update(course, data)
+        result = self.repository.update(course, data)
+        self.cache.invalidate_on_write(course_id)
+        return result
 
     def delete(self, course_id):
         self.repository.delete(course_id)
+        self.cache.invalidate_on_write(course_id)
 
     def _merge_data(self, course, data):
         return {

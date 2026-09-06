@@ -2,7 +2,9 @@ import json
 from django.db.models.deletion import ProtectedError
 from django.http import HttpResponse, JsonResponse
 from django.views.decorators.csrf import csrf_exempt
+from common.cache.cache_service import CacheService
 from common.messages import Messages
+from enrollments.cache.enrollment_cache import EnrollmentCache
 from enrollments.models import Enrollment
 from enrollments.repositories.enrollment_repository import EnrollmentRepository
 from enrollments.services.enrollment_service import EnrollmentService
@@ -10,9 +12,10 @@ from enrollments.services.enrollment_validator import EnrollmentValidator
 
 enrollment_validator = EnrollmentValidator()
 enrollment_repository = EnrollmentRepository()
-enrollment_service = EnrollmentService(enrollment_validator, enrollment_repository)
+enrollment_cache = EnrollmentCache(CacheService())
+enrollment_service = EnrollmentService(enrollment_validator, enrollment_repository, enrollment_cache)
 
-from common.utils import paginate_queryset
+from common.utils import paginate_queryset, resolve_pagination_params
 
 
 def serialize_enrollment(enrollment):
@@ -46,8 +49,12 @@ def enrollment_api(request, enrollment_id = None):
                 return JsonResponse(serialize_enrollment(enrollment))
 
             search = request.GET.get("search", "").strip() or None
-            enrollments = apply_data_scope(request.user, enrollment_repository.get_queryset_for_list(search = search), 'enrollment')
-            return paginate_queryset(request, enrollments, EnrollmentMapper.to_list_dto)
+            #Normalize paging before it reaches the cache key. Scope filtering,
+            #pagination and DTO mapping happen inside the service.
+            page_number, page_size = resolve_pagination_params(request)
+            return JsonResponse(
+                enrollment_service.get_list(request.user, search, page_number, page_size)
+            )
 
         if request.method == "POST":
             data = json.loads(request.body)

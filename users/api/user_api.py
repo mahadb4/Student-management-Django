@@ -8,20 +8,27 @@ from users.models import User
 from users.repositories.user_repository import UserRepository
 from users.services.user_service import UserService
 from users.services.user_validator import UserValidator
+from students.cache.student_cache import StudentCache
 from students.services.student_service import StudentService
 from students.services.student_validator import StudentValidator
 from students.repositories.student_repository import StudentRepository
+from teachers.cache.teacher_cache import TeacherCache
 from teachers.services.teacher_service import TeacherService
 from teachers.services.teacher_validator import TeacherValidator
 from teachers.repositories.teacher_repository import TeacherRepository
+from common.cache.cache_service import CacheService
 
 
 user_validator = UserValidator()
 user_repository = UserRepository()
 user_service = UserService(user_validator, user_repository)
 
-student_service = StudentService(StudentValidator(), StudentRepository())
-teacher_service = TeacherService(TeacherValidator(), TeacherRepository())
+#Onboarding creates Student/Teacher profiles through these services, so they must
+#be given the same entity caches the main APIs use - a raw CacheService has no
+#invalidate_on_write() and would fail at write time, and a separate cache instance
+#would leave the list caches stale after a profile is created.
+student_service = StudentService(StudentValidator(), StudentRepository(), StudentCache(CacheService()))
+teacher_service = TeacherService(TeacherValidator(), TeacherRepository(), TeacherCache(CacheService()))
 
 
 def _create_own_profile(user, profile):

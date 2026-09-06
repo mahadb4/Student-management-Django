@@ -22,16 +22,18 @@ def parse_json_request(request):
         raise ValueError(Messages.INVALID_JSON)
 
 
-def paginate_queryset(request, #Contains: ?page=2&page_size=10
-                      queryset, #This is the database data to paginate like students.objects.all()
-                      serializer_func, 
-                      default_page_size = 10,
-                      max_page_size = 500):
+#Reads ?page= and ?page_size= and normalizes them into safe integers.
+#Extracted so that callers which cache a paginated payload key their cache on the
+#NORMALIZED values ("?page=abc", "?page=-3" and "?page=" must not each create a
+#separate cache entry for what is really page 1).
+def resolve_pagination_params(request,
+                              default_page_size = 10,
+                              max_page_size = 500):
     try:
         page_size = int(
             request.GET.get("page_size", default_page_size)
             )
-        
+
     except (TypeError, ValueError):
         page_size = default_page_size
 
@@ -49,16 +51,26 @@ def paginate_queryset(request, #Contains: ?page=2&page_size=10
     if page_number < 1:
         page_number = 1
 
+    return page_number, page_size
+
+
+#Builds the plain paginated payload dict. Takes ALREADY-normalized page/page_size.
+#Kept separate from paginate_queryset() so a service layer can cache the payload
+#before it is turned into a JsonResponse.
+def build_paginated_payload(queryset,
+                            page_number,
+                            page_size,
+                            serializer_func):
     paginator = Paginator(queryset, page_size)
 
     if paginator.count == 0:
-        return JsonResponse({
+        return {
             "total_count": 0,
             "current_page": 1,
             "page_size": page_size,
             "total_pages": 0,
             "results": [],
-        })
+        }
 
     try:
         page_obj = paginator.page(page_number)
@@ -68,12 +80,23 @@ def paginate_queryset(request, #Contains: ?page=2&page_size=10
         #Suppose: Total pages = 5 User requests: ?page=100 Instead of an error: Return last page = Page 5
         page_obj = paginator.page(paginator.num_pages)
 
-
-    #Now the API sends the final result to the frontend
-    return JsonResponse({
+    return {
         "total_count": paginator.count,
         "current_page": page_obj.number,
         "page_size": page_size,
         "total_pages": paginator.num_pages,
         "results": [serializer_func(item) for item in page_obj],
-    })
+    }
+
+
+def paginate_queryset(request, #Contains: ?page=2&page_size=10
+                      queryset, #This is the database data to paginate like students.objects.all()
+                      serializer_func,
+                      default_page_size = 10,
+                      max_page_size = 500):
+    page_number, page_size = resolve_pagination_params(request, default_page_size, max_page_size)
+
+    #Now the API sends the final result to the frontend
+    return JsonResponse(
+        build_paginated_payload(queryset, page_number, page_size, serializer_func)
+    )

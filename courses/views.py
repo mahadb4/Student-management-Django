@@ -1,4 +1,6 @@
 ﻿from django.shortcuts import get_object_or_404, redirect, render
+from common.cache.cache_service import CacheService
+from courses.cache.course_cache import CourseCache
 from courses.models import Course
 from courses.repositories.course_repository import CourseRepository
 from courses.services.course_service import CourseService
@@ -7,7 +9,8 @@ from departments.models import Department
 
 course_validator = CourseValidator()
 course_repository = CourseRepository()
-course_service = CourseService(course_validator, course_repository)
+course_cache = CourseCache(CacheService())
+course_service = CourseService(course_validator, course_repository, course_cache)
 
 
 def course_list_view(request):

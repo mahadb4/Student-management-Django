@@ -8,7 +8,11 @@ class DepartmentRepository(BaseRepository):
         super().__init__(Department)
 
     def get_queryset_for_list(self, search = None):
-        queryset = self.model.objects.only(
+        #Departments are not passed through apply_data_scope (they are shared data,
+        #see common/permissions.py), so the soft-delete filter must be applied here.
+        #Without it, deleted departments stayed visible in the admin list while
+        #disappearing from every dropdown, which uses get_queryset_for_reference().
+        queryset = self.model.objects.filter(is_deleted = False).only(
             "id", "name", "code", "description", "is_active",
         ).order_by("id")
 

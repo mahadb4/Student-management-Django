@@ -1,12 +1,36 @@
 from common.messages import Messages
+from common.permissions import apply_data_scope
+from common.utils import build_paginated_payload
+from teachers.mappers.teacher_mapper import TeacherMapper
 
 class TeacherService:
-    def __init__(self,validator,repository):
+    #cache is a TeacherCache (teachers/cache/teacher_cache.py), not a raw CacheService.
+    def __init__(self,validator,repository,cache):
         self.validator = validator
         self.repository = repository
+        self.cache = cache
 
-    def get(self,teacher_id): return self.repository.get(teacher_id)
+    def get(self,teacher_id):
+        return self.cache.get_or_load_detail(teacher_id,lambda: self.repository.get(teacher_id))
 
+    #Serves the real React/API list flow: GET /api/teachers/?page=&page_size=&search=
+    #page and page_size must already be normalized (common.utils.resolve_pagination_params)
+    #so equivalent requests share one cache entry.
+    #The cached value is the finished payload, built AFTER scope filtering, pagination
+    #and DTO mapping, so a cache hit skips the database entirely.
+    def get_list(self,user,search,page,page_size):
+        scope_token = self.cache.scope_token_for(user)
+
+        def loader():
+            queryset = self.repository.get_queryset_for_list(search = search)
+            queryset = apply_data_scope(user,queryset,'teacher')
+            return build_paginated_payload(queryset,page,page_size,TeacherMapper.to_list_dto)
+
+        return self.cache.get_or_load_list(scope_token,search,page,page_size,loader)
+
+    #Used only by the legacy server-rendered template view (teachers/views.py).
+    #Not cached: it returns an unfiltered, unpaginated, unscoped queryset that the
+    #React frontend never requests. Real list caching is get_list().
     def get_all(self): return self.repository.get_all()
 
     def create(self,data):
@@ -23,7 +47,9 @@ class TeacherService:
         if self.repository.employee_id_exists(employee_id):
             raise ValueError(Messages.EMPLOYEE_ID_EXISTS.format(employee_id))
 
-        return self.repository.create(data)
+        result = self.repository.create(data)
+        self.cache.invalidate_on_write()
+        return result
 
     def update(self,teacher_id,data,partial = False):
         teacher = self.repository.get(teacher_id)
@@ -43,9 +69,14 @@ class TeacherService:
         if self.repository.employee_id_exists(employee_id,teacher_id):
             raise ValueError(Messages.EMPLOYEE_ID_EXISTS.format(employee_id))
 
-        return self.repository.update(teacher,data)
+        result = self.repository.update(teacher,data)
+        self.cache.invalidate_on_write(teacher_id)
+        return result
 
-    def delete(self,teacher_id): return self.repository.delete(teacher_id)
+    def delete(self,teacher_id):
+        result = self.repository.delete(teacher_id)
+        self.cache.invalidate_on_write(teacher_id)
+        return result
 
     def _merge_data(self,teacher,data):
         return {

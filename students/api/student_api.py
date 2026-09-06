@@ -2,17 +2,20 @@ import json
 from django.db.models.deletion import ProtectedError
 from django.http import HttpResponse, JsonResponse
 from django.views.decorators.csrf import csrf_exempt
+from common.cache.cache_service import CacheService
 from common.messages import Messages
 from students.models import Student
+from students.cache.student_cache import StudentCache
 from students.repositories.student_repository import StudentRepository
 from students.services.student_service import StudentService
 from students.services.student_validator import StudentValidator
 
 student_validator = StudentValidator()
 student_repository = StudentRepository()
-student_service = StudentService(student_validator, student_repository)
+student_cache = StudentCache(CacheService())
+student_service = StudentService(student_validator, student_repository, student_cache)
 
-from common.utils import paginate_queryset
+from common.utils import paginate_queryset, resolve_pagination_params
 
 def serialize_student(student):
     return {
@@ -51,8 +54,13 @@ def student_api(request, student_id = None):
                 return JsonResponse(serialize_student(student))
 
             search = request.GET.get("search", "").strip() or None
-            students = apply_data_scope(request.user, student_repository.get_queryset_for_list(search = search), 'student')
-            return paginate_queryset(request, students, StudentMapper.to_list_dto)
+            #Normalize paging first so the cache key reflects the effective page,
+            #not the raw query string. Scope filtering, pagination and DTO mapping
+            #all happen inside the service, behind the Redis list cache.
+            page_number, page_size = resolve_pagination_params(request)
+            return JsonResponse(
+                student_service.get_list(request.user, search, page_number, page_size)
+            )
 
         if request.method == "POST":
             data = json.loads(request.body)

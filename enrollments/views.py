@@ -1,5 +1,7 @@
 from django.shortcuts import get_object_or_404, redirect, render
+from common.cache.cache_service import CacheService
 from course_offerings.models import CourseOffering
+from enrollments.cache.enrollment_cache import EnrollmentCache
 from enrollments.models import Enrollment
 from enrollments.repositories.enrollment_repository import EnrollmentRepository
 from enrollments.services.enrollment_service import EnrollmentService
@@ -8,7 +10,8 @@ from students.models import Student
 
 enrollment_validator = EnrollmentValidator()
 enrollment_repository = EnrollmentRepository()
-enrollment_service = EnrollmentService(enrollment_validator, enrollment_repository)
+enrollment_cache = EnrollmentCache(CacheService())
+enrollment_service = EnrollmentService(enrollment_validator, enrollment_repository, enrollment_cache)
 
 
 def enrollment_list_view(request):

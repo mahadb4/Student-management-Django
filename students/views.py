@@ -1,12 +1,15 @@
 from django.shortcuts import get_object_or_404, redirect, render
+from common.cache.cache_service import CacheService
 from students.models import Student
+from students.cache.student_cache import StudentCache
 from students.repositories.student_repository import StudentRepository
 from students.services.student_service import StudentService
 from students.services.student_validator import StudentValidator
 
 student_validator = StudentValidator()
 student_repository = StudentRepository()
-student_service = StudentService(student_validator, student_repository)
+student_cache = StudentCache(CacheService())
+student_service = StudentService(student_validator, student_repository, student_cache)
 
 
 def student_list_view(request):
