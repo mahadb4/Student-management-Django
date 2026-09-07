@@ -6,7 +6,7 @@ from common.cache.cache_service import CacheService
 from common.messages import Messages
 from enrollments.cache.enrollment_cache import EnrollmentCache
 from enrollments.models import Enrollment
-from enrollments.repositories.enrollment_repository import EnrollmentRepository
+from enrollments.repositories.enrollment_repository import DEFAULT_ORDERING, ORDERING_FIELDS, EnrollmentRepository
 from enrollments.services.enrollment_service import EnrollmentService
 from enrollments.services.enrollment_validator import EnrollmentValidator
 
@@ -15,7 +15,7 @@ enrollment_repository = EnrollmentRepository()
 enrollment_cache = EnrollmentCache(CacheService())
 enrollment_service = EnrollmentService(enrollment_validator, enrollment_repository, enrollment_cache)
 
-from common.utils import paginate_queryset, resolve_pagination_params
+from common.utils import paginate_queryset, resolve_ordering_param, resolve_pagination_params
 
 
 def serialize_enrollment(enrollment):
@@ -49,11 +49,12 @@ def enrollment_api(request, enrollment_id = None):
                 return JsonResponse(serialize_enrollment(enrollment))
 
             search = request.GET.get("search", "").strip() or None
-            #Normalize paging before it reaches the cache key. Scope filtering,
-            #pagination and DTO mapping happen inside the service.
+            #Normalize paging/ordering before they reach the cache key. Scope
+            #filtering, ordering, pagination and DTO mapping happen inside the service.
             page_number, page_size = resolve_pagination_params(request)
+            ordering = resolve_ordering_param(request, ORDERING_FIELDS, DEFAULT_ORDERING)
             return JsonResponse(
-                enrollment_service.get_list(request.user, search, page_number, page_size)
+                enrollment_service.get_list(request.user, search, page_number, page_size, ordering)
             )
 
         if request.method == "POST":

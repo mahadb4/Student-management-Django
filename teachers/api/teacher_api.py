@@ -6,7 +6,7 @@ from common.cache.cache_service import CacheService
 from common.messages import Messages
 from teachers.cache.teacher_cache import TeacherCache
 from teachers.models import Teacher
-from teachers.repositories.teacher_repository import TeacherRepository
+from teachers.repositories.teacher_repository import DEFAULT_ORDERING, ORDERING_FIELDS, TeacherRepository
 from teachers.services.teacher_service import TeacherService
 from teachers.services.teacher_validator import TeacherValidator
 
@@ -15,7 +15,7 @@ teacher_repository = TeacherRepository()
 teacher_cache = TeacherCache(CacheService())
 teacher_service = TeacherService(teacher_validator, teacher_repository, teacher_cache)
 
-from common.utils import paginate_queryset, resolve_pagination_params
+from common.utils import paginate_queryset, resolve_ordering_param, resolve_pagination_params
 
 def serialize_teacher_profile(teacher):
     return {
@@ -70,12 +70,19 @@ def teacher_api(request, teacher_id = None):
                 return JsonResponse(serialize_teacher(teacher))
 
             search = request.GET.get("search", "").strip() or None
-            #Normalize paging first so the cache key reflects the effective page,
-            #not the raw query string. Scope filtering, pagination and DTO mapping
-            #all happen inside the service, behind the Redis list cache.
+            department_id = request.GET.get("department", "").strip() or None
+            if department_id is not None:
+                try:
+                    department_id = int(department_id)
+                except ValueError:
+                    department_id = None
+            #Normalize paging/ordering first so the cache key reflects the effective
+            #values, not the raw query string. Scope filtering, ordering, pagination
+            #and DTO mapping all happen inside the service, behind the Redis list cache.
             page_number, page_size = resolve_pagination_params(request)
+            ordering = resolve_ordering_param(request, ORDERING_FIELDS, DEFAULT_ORDERING)
             return JsonResponse(
-                teacher_service.get_list(request.user, search, page_number, page_size)
+                teacher_service.get_list(request.user, search, page_number, page_size, department_id, ordering)
             )
 
         if request.method == "POST":

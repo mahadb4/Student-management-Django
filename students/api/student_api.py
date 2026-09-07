@@ -15,7 +15,8 @@ student_repository = StudentRepository()
 student_cache = StudentCache(CacheService())
 student_service = StudentService(student_validator, student_repository, student_cache)
 
-from common.utils import paginate_queryset, resolve_pagination_params
+from common.utils import paginate_queryset, resolve_ordering_param, resolve_pagination_params
+from students.repositories.student_repository import DEFAULT_ORDERING, ORDERING_FIELDS
 
 def serialize_student(student):
     return {
@@ -54,12 +55,19 @@ def student_api(request, student_id = None):
                 return JsonResponse(serialize_student(student))
 
             search = request.GET.get("search", "").strip() or None
-            #Normalize paging first so the cache key reflects the effective page,
-            #not the raw query string. Scope filtering, pagination and DTO mapping
-            #all happen inside the service, behind the Redis list cache.
+            department_id = request.GET.get("department", "").strip() or None
+            if department_id is not None:
+                try:
+                    department_id = int(department_id)
+                except ValueError:
+                    department_id = None
+            #Normalize paging/ordering first so the cache key reflects the effective
+            #values, not the raw query string. Scope filtering, ordering, pagination
+            #and DTO mapping all happen inside the service, behind the Redis list cache.
             page_number, page_size = resolve_pagination_params(request)
+            ordering = resolve_ordering_param(request, ORDERING_FIELDS, DEFAULT_ORDERING)
             return JsonResponse(
-                student_service.get_list(request.user, search, page_number, page_size)
+                student_service.get_list(request.user, search, page_number, page_size, department_id, ordering)
             )
 
         if request.method == "POST":

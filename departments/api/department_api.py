@@ -7,7 +7,7 @@ from common.cache.cache_service import CacheService
 from common.messages import Messages
 from departments.cache.department_cache import DepartmentCache
 from departments.models import Department
-from departments.repositories.department_repository import DepartmentRepository
+from departments.repositories.department_repository import DEFAULT_ORDERING, ORDERING_FIELDS, DepartmentRepository
 from departments.services.department_service import DepartmentService
 from departments.services.department_validator import DepartmentValidator
 from departments.mappers.department_mapper import DepartmentMapper
@@ -17,7 +17,7 @@ department_repository = DepartmentRepository()
 department_cache = DepartmentCache(CacheService())
 department_service = DepartmentService(department_validator, department_repository, department_cache)
 
-from common.utils import paginate_queryset, resolve_pagination_params
+from common.utils import paginate_queryset, resolve_ordering_param, resolve_pagination_params
 
 
 def serialize_department(department):
@@ -42,12 +42,13 @@ def department_api(request, department_id = None):
                 return JsonResponse(serialize_department(department))
 
             search = request.GET.get("search", "").strip() or None
-            #Normalize paging first so the cache key reflects the effective page,
-            #not the raw query string. Pagination and DTO mapping happen inside
-            #the service, behind the Redis list cache.
+            #Normalize paging/ordering first so the cache key reflects the effective
+            #values, not the raw query string. Ordering, pagination and DTO mapping
+            #happen inside the service, behind the Redis list cache.
             page_number, page_size = resolve_pagination_params(request)
+            ordering = resolve_ordering_param(request, ORDERING_FIELDS, DEFAULT_ORDERING)
             return JsonResponse(
-                department_service.get_list(request.user, search, page_number, page_size)
+                department_service.get_list(request.user, search, page_number, page_size, ordering)
             )
 
         if request.method == "POST":
@@ -111,9 +112,11 @@ def department_reference_api(request):
     if request.method != "GET":
         return JsonResponse({"error": Messages.METHOD_NOT_ALLOWED}, status = 405)
 
+    search = request.GET.get("search", "").strip() or None
+
     #default_page_size = 10 must match what the service caches under, so the key
     #reflects the page size actually served.
     page_number, page_size = resolve_pagination_params(request, default_page_size = 10)
     return JsonResponse(
-        department_service.get_reference_list(request.user, page_number, page_size)
+        department_service.get_reference_list(request.user, page_number, page_size, search)
     )

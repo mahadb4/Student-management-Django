@@ -1,3 +1,4 @@
+from django.db.models import Q
 from common.messages import Messages
 from enrollments.models import Enrollment
 
@@ -13,10 +14,17 @@ class AttendanceService:
         return self.repository.get_all()
 
     def get_active_enrollment(self,enrollment_id):
+        # course_offering.is_active isn't recomputed when its Course/Teacher/
+        # Section is later deactivated (no cascade in this system), so it can
+        # go stale relative to its parents - re-check them directly here too.
+        # Section is nullable on CourseOffering, so a missing section must not
+        # be excluded by the active check (Q keeps offerings with no section).
         return Enrollment.objects.select_related(
             "student",
             "course_offering",
+            "course_offering__course",
             "course_offering__teacher",
+            "course_offering__section",
         ).filter(
             id = enrollment_id,
             status = Enrollment.Status.ACTIVE,
@@ -25,6 +33,10 @@ class AttendanceService:
             student__is_active = True,
             course_offering__is_deleted = False,
             course_offering__is_active = True,
+            course_offering__course__is_active = True,
+            course_offering__teacher__is_active = True,
+        ).filter(
+            Q(course_offering__section__isnull = True) | Q(course_offering__section__is_active = True),
         ).first()
 
     def create(self,data,teacher):

@@ -7,7 +7,7 @@ from common.cache.cache_service import CacheService
 from common.messages import Messages
 from courses.cache.course_cache import CourseCache
 from courses.models import Course
-from courses.repositories.course_repository import CourseRepository
+from courses.repositories.course_repository import DEFAULT_ORDERING, ORDERING_FIELDS, CourseRepository
 from courses.services.course_service import CourseService
 from courses.services.course_validator import CourseValidator
 
@@ -16,7 +16,7 @@ course_repository = CourseRepository()
 course_cache = CourseCache(CacheService())
 course_service = CourseService(course_validator, course_repository, course_cache)
 
-from common.utils import paginate_queryset, resolve_pagination_params
+from common.utils import paginate_queryset, resolve_ordering_param, resolve_pagination_params
 from courses.mappers.course_mapper import CourseMapper
 
 def serialize_course(course):
@@ -44,10 +44,11 @@ def course_api(request, course_id = None):
                 return JsonResponse(serialize_course(course))
 
             search = request.GET.get("search", "").strip() or None
-            #Normalize paging before it reaches the cache key.
+            #Normalize paging/ordering before they reach the cache key.
             page_number, page_size = resolve_pagination_params(request)
+            ordering = resolve_ordering_param(request, ORDERING_FIELDS, DEFAULT_ORDERING)
             return JsonResponse(
-                course_service.get_list(request.user, search, page_number, page_size)
+                course_service.get_list(request.user, search, page_number, page_size, ordering)
             )
 
         if request.method == "POST":

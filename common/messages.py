@@ -154,6 +154,9 @@ class Messages:
     ENROLLMENT_SECTION_MISMATCH = "Student can only be enrolled in a course offering for their own section."
     STUDENT_INACTIVE = "Inactive student cannot be enrolled."
     COURSE_OFFERING_INACTIVE = "Inactive course offering cannot be used for enrollment."
+    COURSE_OFFERING_COURSE_INACTIVE = "Course offering's course is inactive and cannot be used for enrollment."
+    COURSE_OFFERING_TEACHER_INACTIVE = "Course offering's teacher is inactive and cannot be used for enrollment."
+    COURSE_OFFERING_SECTION_INACTIVE = "Course offering's section is inactive and cannot be used for enrollment."
 
     COURSE_SECTION_SEMESTER_MISMATCH = "Course is designed for semester {} but the selected section is semester {}."
 

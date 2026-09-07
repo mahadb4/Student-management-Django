@@ -1,7 +1,8 @@
 from common.messages import Messages
 from common.permissions import apply_data_scope
-from common.utils import build_paginated_payload
+from common.utils import apply_ordering, build_paginated_payload
 from teachers.mappers.teacher_mapper import TeacherMapper
+from teachers.repositories.teacher_repository import ORDERING_FIELDS
 
 class TeacherService:
     #cache is a TeacherCache (teachers/cache/teacher_cache.py), not a raw CacheService.
@@ -18,15 +19,17 @@ class TeacherService:
     #so equivalent requests share one cache entry.
     #The cached value is the finished payload, built AFTER scope filtering, pagination
     #and DTO mapping, so a cache hit skips the database entirely.
-    def get_list(self,user,search,page,page_size):
+    def get_list(self,user,search,page,page_size,department_id=None,ordering=None):
         scope_token = self.cache.scope_token_for(user)
+        filters = {"department_id": department_id, "ordering": ordering}
 
         def loader():
-            queryset = self.repository.get_queryset_for_list(search = search)
+            queryset = self.repository.get_queryset_for_list(search = search, department_id = department_id)
             queryset = apply_data_scope(user,queryset,'teacher')
+            queryset = apply_ordering(queryset,ordering,ORDERING_FIELDS)
             return build_paginated_payload(queryset,page,page_size,TeacherMapper.to_list_dto)
 
-        return self.cache.get_or_load_list(scope_token,search,page,page_size,loader)
+        return self.cache.get_or_load_list(scope_token,search,page,page_size,loader,filters=filters)
 
     #Used only by the legacy server-rendered template view (teachers/views.py).
     #Not cached: it returns an unfiltered, unpaginated, unscoped queryset that the

@@ -6,7 +6,7 @@ from common.cache.cache_service import CacheService
 from common.messages import Messages
 from course_offerings.cache.course_offering_cache import CourseOfferingCache
 from course_offerings.models import CourseOffering
-from course_offerings.repositories.course_offering_repository import CourseOfferingRepository
+from course_offerings.repositories.course_offering_repository import DEFAULT_ORDERING, ORDERING_FIELDS, CourseOfferingRepository
 from course_offerings.services.course_offering_service import CourseOfferingService
 from course_offerings.services.course_offering_validator import CourseOfferingValidator
 
@@ -15,7 +15,7 @@ course_offering_repository = CourseOfferingRepository()
 course_offering_cache = CourseOfferingCache(CacheService())
 course_offering_service = CourseOfferingService(course_offering_validator, course_offering_repository, course_offering_cache)
 
-from common.utils import paginate_queryset, resolve_pagination_params
+from common.utils import paginate_queryset, resolve_ordering_param, resolve_pagination_params
 
 
 def serialize_course_offering(offering):
@@ -60,12 +60,18 @@ def course_offering_api(request, offering_id = None):
             section_id_param = request.GET.get("section_id", "").strip()
             section_id = int(section_id_param) if section_id_param.isdigit() else None
 
-            #Normalize paging before it reaches the cache key. Scope filtering,
-            #pagination and DTO mapping happen inside the service.
+            # Opt-in, default unchanged: only a picker selecting an offering
+            # for a NEW Enrollment sends this (see Enrollments.tsx) - the
+            # CourseOfferings management table still needs inactive rows.
+            active_only = request.GET.get("active_only", "").strip().lower() == "true"
+
+            #Normalize paging/ordering before they reach the cache key. Scope
+            #filtering, ordering, pagination and DTO mapping happen inside the service.
             page_number, page_size = resolve_pagination_params(request)
+            ordering = resolve_ordering_param(request, ORDERING_FIELDS, DEFAULT_ORDERING)
             return JsonResponse(
                 course_offering_service.get_list(
-                    request.user, search, section_id, page_number, page_size,
+                    request.user, search, section_id, page_number, page_size, active_only, ordering,
                 )
             )
 

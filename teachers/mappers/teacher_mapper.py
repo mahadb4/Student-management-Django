@@ -11,7 +11,6 @@ class TeacherMapper:
             name = f"{teacher.first_name} {teacher.last_name}",
             email = teacher.email,
             designation = teacher.designation,
-            department_id = teacher.department_id,
             department_name = teacher.department.name if teacher.department_id else None,
         ).to_dict()
 

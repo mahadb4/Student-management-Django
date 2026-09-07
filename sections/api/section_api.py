@@ -7,7 +7,7 @@ from common.cache.cache_service import CacheService
 from common.messages import Messages
 from sections.cache.section_cache import SectionCache
 from sections.models import Section
-from sections.repositories.section_repository import SectionRepository
+from sections.repositories.section_repository import DEFAULT_ORDERING, ORDERING_FIELDS, SectionRepository
 from sections.services.section_service import SectionService
 from sections.services.section_validator import SectionValidator
 
@@ -16,7 +16,7 @@ section_repository = SectionRepository()
 section_cache = SectionCache(CacheService())
 section_service = SectionService(section_validator, section_repository, section_cache)
 
-from common.utils import paginate_queryset, resolve_pagination_params
+from common.utils import paginate_queryset, resolve_ordering_param, resolve_pagination_params
 from sections.mappers.section_mapper import SectionMapper
 
 
@@ -43,12 +43,13 @@ def section_api(request, section_id = None):
                 return JsonResponse(serialize_section(section))
 
             search = request.GET.get("search", "").strip() or None
-            #Normalize paging first so the cache key reflects the effective page,
-            #not the raw query string. Pagination and DTO mapping happen inside
-            #the service, behind the Redis list cache.
+            #Normalize paging/ordering first so the cache key reflects the effective
+            #values, not the raw query string. Ordering, pagination and DTO mapping
+            #happen inside the service, behind the Redis list cache.
             page_number, page_size = resolve_pagination_params(request)
+            ordering = resolve_ordering_param(request, ORDERING_FIELDS, DEFAULT_ORDERING)
             return JsonResponse(
-                section_service.get_list(request.user, search, page_number, page_size)
+                section_service.get_list(request.user, search, page_number, page_size, ordering)
             )
 
         if request.method == "POST":

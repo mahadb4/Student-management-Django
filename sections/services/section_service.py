@@ -1,6 +1,7 @@
 from common.messages import Messages
-from common.utils import build_paginated_payload
+from common.utils import apply_ordering, build_paginated_payload
 from sections.mappers.section_mapper import SectionMapper
+from sections.repositories.section_repository import ORDERING_FIELDS
 
 
 class SectionService:
@@ -15,16 +16,19 @@ class SectionService:
     def get(self, section_id):
         return self.repository.get(section_id)
 
-    #Serves the real React/API list flow: GET /api/sections/?page=&page_size=&search=
-    #page and page_size must already be normalized (common.utils.resolve_pagination_params).
-    def get_list(self, user, search, page, page_size):
+    #Serves the real React/API list flow: GET /api/sections/?page=&page_size=&search=&ordering=
+    #page, page_size and ordering must already be normalized (common.utils.resolve_pagination_params/
+    #resolve_ordering_param).
+    def get_list(self, user, search, page, page_size, ordering = None):
         scope_token = self.cache.scope_token_for(user)
+        filters = {"ordering": ordering}
 
         def loader():
             queryset = self.repository.get_queryset_for_list(search = search)
+            queryset = apply_ordering(queryset, ordering, ORDERING_FIELDS)
             return build_paginated_payload(queryset, page, page_size, SectionMapper.to_list_dto)
 
-        return self.cache.get_or_load_list(scope_token, search, page, page_size, loader)
+        return self.cache.get_or_load_list(scope_token, search, page, page_size, loader, filters = filters)
 
     #Serves the dropdown/reference flow: GET /api/sections/reference/
     #The three filters are optional and callers send different subsets of them, so

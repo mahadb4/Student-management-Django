@@ -8,10 +8,7 @@ class StudentMapper:
             id = student.id,
             name = f"{student.first_name} {student.last_name}",
             student_email = student.student_email,
-            is_active = student.is_active,
-            department_id = student.department_id,
             department_name = student.department.name if student.department_id else None,
-            section_id = student.section_id,
             section_name = student.section.name if student.section_id else None,
         ).to_dict()
 

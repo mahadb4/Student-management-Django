@@ -11,7 +11,6 @@ class SectionMapper:
             semester_number = section.semester_number,
             academic_year = section.academic_year,
             is_active = section.is_active,
-            department_id = section.department_id,
             department_name = section.department.name if section.department_id else None,
         ).to_dict()
 

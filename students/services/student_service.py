@@ -1,7 +1,8 @@
 from common.messages import Messages
 from common.permissions import apply_data_scope
-from common.utils import build_paginated_payload
+from common.utils import apply_ordering, build_paginated_payload
 from students.mappers.student_mapper import StudentMapper
+from students.repositories.student_repository import ORDERING_FIELDS
 
 class StudentService:
     #cache is a StudentCache (students/cache/student_cache.py), not a raw CacheService.
@@ -13,20 +14,22 @@ class StudentService:
     def get(self,student_id):
         return self.cache.get_or_load_detail(student_id,lambda: self.repository.get(student_id))
 
-    #Serves the real React/API list flow: GET /api/students/?page=&page_size=&search=
-    #page and page_size must already be normalized (common.utils.resolve_pagination_params)
-    #so equivalent requests share one cache entry.
-    #The cached value is the finished payload, built AFTER scope filtering, pagination
+    #Serves the real React/API list flow: GET /api/students/?page=&page_size=&search=&department=&ordering=
+    #page, page_size and ordering must already be normalized (common.utils.resolve_pagination_params/
+    #resolve_ordering_param) so equivalent requests share one cache entry.
+    #The cached value is the finished payload, built AFTER scope filtering, ordering and pagination,
     #and DTO mapping, so a cache hit skips the database entirely.
-    def get_list(self,user,search,page,page_size):
+    def get_list(self,user,search,page,page_size,department_id=None,ordering=None):
         scope_token = self.cache.scope_token_for(user)
+        filters = {"department_id": department_id, "ordering": ordering}
 
         def loader():
-            queryset = self.repository.get_queryset_for_list(search = search)
+            queryset = self.repository.get_queryset_for_list(search = search, department_id = department_id)
             queryset = apply_data_scope(user,queryset,'student')
+            queryset = apply_ordering(queryset,ordering,ORDERING_FIELDS)
             return build_paginated_payload(queryset,page,page_size,StudentMapper.to_list_dto)
 
-        return self.cache.get_or_load_list(scope_token,search,page,page_size,loader)
+        return self.cache.get_or_load_list(scope_token,search,page,page_size,loader,filters=filters)
 
     #Used only by the legacy server-rendered template view (students/views.py).
     #Deliberately NOT cached: the old "students:all" key cached an unfiltered,

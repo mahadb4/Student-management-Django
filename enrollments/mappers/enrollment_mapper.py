@@ -15,10 +15,8 @@ class EnrollmentMapper:
         return EnrollmentListDTO(
             id = enrollment.id,
             status = enrollment.status,
-            student_id = enrollment.student.id,
             student_name = f"{enrollment.student.first_name} {enrollment.student.last_name}",
             student_email = enrollment.student.student_email,
-            course_offering_id = enrollment.course_offering.id,
             semester = enrollment.course_offering.semester,
             academic_year = enrollment.course_offering.academic_year,
             course_name = enrollment.course_offering.course.name,
@@ -47,7 +45,6 @@ class EnrollmentMapper:
         return StudentEnrollmentListDTO(
             id = enrollment.id,
             status = enrollment.status,
-            course_offering_id = enrollment.course_offering.id,
             semester = enrollment.course_offering.semester,
             academic_year = enrollment.course_offering.academic_year,
             course_name = enrollment.course_offering.course.name,
@@ -69,9 +66,10 @@ class EnrollmentMapper:
         ).to_dict()
 
     # Used only by the authenticated Teacher's own /teachers/me/students/ -
-    # drops the teacher's own identity (already known: it's them) and any
-    # raw ids besides course_offering_id, which the Students/Attendance
-    # pages' class filter dropdown needs to match rows against.
+    # drops the teacher's own identity (already known: it's them) and any raw
+    # ids. The class filter dropdown on the Students/Attendance pages is built
+    # from a separate CourseOffering reference call, not from a field here -
+    # confirmed course_offering_id was unread by both consumers and dropped.
     @staticmethod
     def to_teacher_list_dto(enrollment):
         section_name = (
@@ -81,7 +79,6 @@ class EnrollmentMapper:
 
         return EnrollmentTeacherListDTO(
             enrollment_id = enrollment.id,
-            course_offering_id = enrollment.course_offering.id,
             student_name = f"{enrollment.student.first_name} {enrollment.student.last_name}",
             student_email = enrollment.student.student_email,
             course_name = enrollment.course_offering.course.name,
