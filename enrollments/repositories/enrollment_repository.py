@@ -2,12 +2,21 @@ from django.db.models import Q
 from common.repositories.base_repository import BaseRepository
 from enrollments.models import Enrollment
 
+#Only Name sorting is supported (by design - see common.utils.apply_ordering()).
+#"name" here means the enrolled Student's name, its only meaningful "name" field.
+ORDERING_FIELDS = {
+    "name": ("student__first_name", "student__last_name"),
+}
+DEFAULT_ORDERING = "name"
+
 
 class EnrollmentRepository(BaseRepository):
     def __init__(self):
         super().__init__(Enrollment)
 
     def get_queryset_for_list(self, search = None):
+        #No .order_by() here - final ordering is applied by the service, after
+        #apply_data_scope(), via common.utils.apply_ordering() (see ORDERING_FIELDS above).
         queryset = self.model.objects.select_related(
             "student", "course_offering__course", "course_offering__section", "course_offering__teacher",
         ).only(
@@ -17,7 +26,7 @@ class EnrollmentRepository(BaseRepository):
             "course_offering__course__id", "course_offering__course__name", "course_offering__course__code",
             "course_offering__section__id", "course_offering__section__name",
             "course_offering__teacher__id", "course_offering__teacher__first_name", "course_offering__teacher__last_name",
-        ).order_by("id")
+        )
 
         if search:
             for term in search.split():

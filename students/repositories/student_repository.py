@@ -2,12 +2,23 @@ from django.db.models import Q
 from common.repositories.base_repository import BaseRepository
 from students.models import Student
 
+#Only Name sorting is supported (by design - see common.utils.apply_ordering()).
+#"name" isn't a real DB column (StudentListDTO computes it from first/last), so
+#it maps to the actual underlying fields here.
+ORDERING_FIELDS = {
+    "name": ("first_name", "last_name"),
+}
+DEFAULT_ORDERING = "name"
+
 
 class StudentRepository(BaseRepository):
     def __init__(self):
         super().__init__(Student)
 
-    def get_queryset_for_list(self, search = None):
+    def get_queryset_for_list(self, search = None, department_id = None):
+        #No .order_by() here - final ordering is applied by the service, after
+        #apply_data_scope(), via common.utils.apply_ordering() (see ORDERING_FIELDS
+        #above). Search/filtering stays here, unchanged.
         queryset = self.model.objects.select_related(
             "department", "section").only(
 
@@ -15,7 +26,7 @@ class StudentRepository(BaseRepository):
             "department__id", "department__name",
             "section__id", "section__name",
 
-        ).order_by("id")
+        )
 
         if search:
             for term in search.split():
@@ -25,10 +36,17 @@ class StudentRepository(BaseRepository):
                     | Q(student_email__icontains = term)
                 )
 
+        if department_id is not None:
+            queryset = queryset.filter(department_id = department_id)
+
         return queryset
 
     def get_queryset_for_reference(self):
-        return self.model.objects.filter(is_deleted = False).only(
+        # Reference/dropdown use only (new-record selection, e.g. the Admin
+        # Enrollment form's Student picker) - see
+        # DepartmentRepository.get_queryset_for_reference for why is_active is
+        # filtered here but not in get_queryset_for_list().
+        return self.model.objects.filter(is_deleted = False, is_active = True).only(
             "id", "first_name", "last_name", "student_email", "section_id",
         ).order_by("first_name", "last_name")
 

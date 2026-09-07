@@ -1,7 +1,8 @@
 from common.messages import Messages
 from common.permissions import apply_data_scope
-from common.utils import build_paginated_payload
+from common.utils import apply_ordering, build_paginated_payload
 from enrollments.mappers.enrollment_mapper import EnrollmentMapper
+from enrollments.repositories.enrollment_repository import ORDERING_FIELDS
 
 
 class EnrollmentService:
@@ -19,15 +20,17 @@ class EnrollmentService:
     #GET /api/enrollments/?page=&page_size=&search=
     #Scoped per user: admin sees all, a teacher those in their own offerings,
     #a student their own.
-    def get_list(self,user,search,page,page_size):
+    def get_list(self,user,search,page,page_size,ordering=None):
         scope_token = self.cache.scope_token_for(user)
+        filters = {"ordering": ordering}
 
         def loader():
             queryset = self.repository.get_queryset_for_list(search = search)
             queryset = apply_data_scope(user,queryset,'enrollment')
+            queryset = apply_ordering(queryset,ordering,ORDERING_FIELDS)
             return build_paginated_payload(queryset,page,page_size,EnrollmentMapper.to_list_dto)
 
-        return self.cache.get_or_load_list(scope_token,search,page,page_size,loader)
+        return self.cache.get_or_load_list(scope_token,search,page,page_size,loader,filters=filters)
 
     #Used only by the legacy server-rendered template view.
     def get_all(self):
@@ -81,7 +84,9 @@ class EnrollmentService:
         from course_offerings.models import CourseOffering
 
         student = Student.objects.get(id = student_id,is_deleted = False)
-        course_offering = CourseOffering.objects.get(id = course_offering_id,is_deleted = False)
+        course_offering = CourseOffering.objects.select_related(
+            "course","teacher","section",
+        ).get(id = course_offering_id,is_deleted = False)
 
         if student.section_id != course_offering.section_id:
             raise ValueError(Messages.ENROLLMENT_SECTION_MISMATCH)
@@ -91,6 +96,20 @@ class EnrollmentService:
 
         if not course_offering.is_active:
             raise ValueError(Messages.COURSE_OFFERING_INACTIVE)
+
+        # A CourseOffering's own is_active flag isn't recomputed when its
+        # Course/Teacher/Section is later deactivated (no cascade in this
+        # system - see department/course/section/teacher services), so it can
+        # go stale relative to its parents. Re-check them here rather than
+        # only trusting the offering's own flag.
+        if not course_offering.course.is_active:
+            raise ValueError(Messages.COURSE_OFFERING_COURSE_INACTIVE)
+
+        if not course_offering.teacher.is_active:
+            raise ValueError(Messages.COURSE_OFFERING_TEACHER_INACTIVE)
+
+        if course_offering.section_id and not course_offering.section.is_active:
+            raise ValueError(Messages.COURSE_OFFERING_SECTION_INACTIVE)
 
     def _merge_data(self,enrollment,data):
         return {

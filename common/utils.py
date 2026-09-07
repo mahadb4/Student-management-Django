@@ -54,6 +54,45 @@ def resolve_pagination_params(request,
     return page_number, page_size
 
 
+#Reads ?ordering= and normalizes it into a safe, allowlisted value. Currently only
+#"name"/"-name" sorting is supported anywhere in the project (see each entity
+#repository's ORDERING_FIELDS), so allowed_fields is always a single-key map, but
+#this stays generic in case a second sortable field is ever genuinely needed.
+#
+#Extracted for the same reason as resolve_pagination_params(): callers which cache
+#a paginated payload key their cache on the NORMALIZED value, so an invalid/missing
+#?ordering= always falls back to the same default rather than fragmenting the cache.
+#
+#allowed_fields: dict mapping a public ordering key (no leading "-") to a tuple of
+#real ORM field lookups in ascending order, e.g. {"name": ("first_name","last_name")}.
+#default: the public key to use (ascending) when ?ordering= is missing or not present
+#in allowed_fields. Never raises - an invalid value is treated the same as a missing one.
+def resolve_ordering_param(request, allowed_fields, default):
+    raw = request.GET.get("ordering", "").strip()
+    key = raw[1:] if raw.startswith("-") else raw
+
+    if key in allowed_fields:
+        return raw
+
+    return default
+
+
+#Applies an ALREADY-normalized ordering value (from resolve_ordering_param) to a
+#queryset, translating the public key to its real ORM field(s) via allowed_fields,
+#and appending "id" as a deterministic secondary sort so rows with an equal primary
+#value still paginate stably - direction-matched to the primary field, e.g.
+#"name" -> id ASC, "-name" -> id DESC.
+def apply_ordering(queryset, ordering, allowed_fields):
+    descending = ordering.startswith("-")
+    key = ordering[1:] if descending else ordering
+    fields = allowed_fields[key]
+
+    if descending:
+        fields = tuple(f"-{field}" for field in fields)
+
+    return queryset.order_by(*fields, "-id" if descending else "id")
+
+
 #Builds the plain paginated payload dict. Takes ALREADY-normalized page/page_size.
 #Kept separate from paginate_queryset() so a service layer can cache the payload
 #before it is turned into a JsonResponse.

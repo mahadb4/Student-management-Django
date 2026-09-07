@@ -3,10 +3,8 @@ class EnrollmentListDTO:
         self,
         id,
         status,
-        student_id,
         student_name,
         student_email,
-        course_offering_id,
         semester,
         academic_year,
         course_name,
@@ -15,10 +13,8 @@ class EnrollmentListDTO:
     ):
         self.id = id
         self.status = status
-        self.student_id = student_id
         self.student_name = student_name
         self.student_email = student_email
-        self.course_offering_id = course_offering_id
         self.semester = semester
         self.academic_year = academic_year
         self.course_name = course_name
@@ -29,10 +25,8 @@ class EnrollmentListDTO:
         return {
             "id": self.id,
             "status": self.status,
-            "student_id": self.student_id,
             "student_name": self.student_name,
             "student_email": self.student_email,
-            "course_offering_id": self.course_offering_id,
             "semester": self.semester,
             "academic_year": self.academic_year,
             "course_name": self.course_name,

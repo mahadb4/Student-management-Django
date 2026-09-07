@@ -1,6 +1,7 @@
 ﻿from common.messages import Messages
-from common.utils import build_paginated_payload
+from common.utils import apply_ordering, build_paginated_payload
 from courses.mappers.course_mapper import CourseMapper
+from courses.repositories.course_repository import ORDERING_FIELDS
 from courses.services.course_validator import CourseValidator
 
 
@@ -15,16 +16,19 @@ class CourseService:
     def get(self, course_id):
         return self.cache.get_or_load_detail(course_id, lambda: self.repository.get(course_id))
 
-    #GET /api/courses/?page=&page_size=&search=
-    #page/page_size must already be normalized (common.utils.resolve_pagination_params).
-    def get_list(self, user, search, page, page_size):
+    #GET /api/courses/?page=&page_size=&search=&ordering=
+    #page/page_size/ordering must already be normalized (common.utils.resolve_pagination_params/
+    #resolve_ordering_param).
+    def get_list(self, user, search, page, page_size, ordering = None):
         scope_token = self.cache.scope_token_for(user)
+        filters = {"ordering": ordering}
 
         def loader():
             queryset = self.repository.get_queryset_for_list(search = search)
+            queryset = apply_ordering(queryset, ordering, ORDERING_FIELDS)
             return build_paginated_payload(queryset, page, page_size, CourseMapper.to_list_dto)
 
-        return self.cache.get_or_load_list(scope_token, search, page, page_size, loader)
+        return self.cache.get_or_load_list(scope_token, search, page, page_size, loader, filters = filters)
 
     #GET /api/courses/reference/ - dropdown projection, narrowed by department
     #and/or program semester. Values must arrive already normalized ("" -> None).

@@ -2,6 +2,14 @@ from django.db.models import Count, Q
 from common.repositories.base_repository import BaseRepository
 from course_offerings.models import CourseOffering
 
+#Only Name sorting is supported (by design - see common.utils.apply_ordering()).
+#"name" here means the offering's Course name, its only meaningful "name" field.
+ORDERING_FIELDS = {
+    "name": ("course__name",),
+}
+DEFAULT_ORDERING = "name"
+
+
 class CourseOfferingRepository(BaseRepository):
     def __init__(self):
         super().__init__(CourseOffering)
@@ -24,7 +32,12 @@ class CourseOfferingRepository(BaseRepository):
             )
         ).order_by("id")
 
-    def get_queryset_for_list(self, search = None, section_id = None):
+    def get_queryset_for_list(self, search = None, section_id = None, active_only = False):
+        # order_by("id") here is only a default fallback for callers that don't
+        # apply their own ordering afterward (e.g. get_queryset_for_discovery()
+        # below, which is out of scope for sorting). CourseOfferingService.get_list()
+        # calls common.utils.apply_ordering() on the result, which fully replaces
+        # this with the requested ordering (see ORDERING_FIELDS above).
         queryset = self.model.objects.select_related("course", "teacher", "section").only(
             "id", "semester", "academic_year", "is_active",
             "course__id", "course__name", "course__code",
@@ -51,6 +64,13 @@ class CourseOfferingRepository(BaseRepository):
         if section_id is not None:
             queryset = queryset.filter(section_id = section_id)
 
+        # Opt-in: the admin CourseOfferings management table needs to keep
+        # showing inactive offerings (default False, unchanged), but a picker
+        # used to select an offering for a NEW Enrollment should not offer
+        # inactive ones - see Enrollments.tsx's Course Offering PaginatedSelect.
+        if active_only:
+            queryset = queryset.filter(is_active = True)
+
         return queryset
 
     def get_queryset_for_discovery(self, section_id, search = None):
@@ -67,8 +87,13 @@ class CourseOfferingRepository(BaseRepository):
         #
         # is_deleted is filtered explicitly because this path bypasses
         # apply_data_scope, which is what normally supplies that filter.
+        # is_active is filtered server-side for the same reason a student
+        # shouldn't be able to select an inactive offering to enrol in - the
+        # frontend already discards inactive rows client-side (belt-and-braces
+        # left in place), but the backend is the actual source of truth.
         return self.get_queryset_for_list(search = search).filter(
             is_deleted = False,
+            is_active = True,
             section_id = section_id,
         )
 

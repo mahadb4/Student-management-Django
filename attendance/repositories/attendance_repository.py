@@ -6,12 +6,14 @@ class AttendanceRepository(BaseRepository):
         super().__init__(Attendance)
 
     def get_queryset_for_list(self):
+        #Most recent attendance first (by the actual attendance date, not id/
+        #created_at), with -id as a deterministic tiebreaker for same-date rows.
         return self.model.objects.select_related("enrollment__student","enrollment__course_offering__course").only(
             "id","date","status","remarks","enrollment__id","enrollment__student__id",
             "enrollment__student__first_name","enrollment__student__last_name",
             "enrollment__course_offering__id","enrollment__course_offering__course__id",
             "enrollment__course_offering__course__code",
-        ).order_by("id")
+        ).order_by("-date","-id")
 
     def get_by_enrollment_and_date(self,enrollment_id,attendance_date):
         return self.model.objects.filter(

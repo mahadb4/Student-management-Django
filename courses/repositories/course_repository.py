@@ -2,17 +2,25 @@
 from common.repositories.base_repository import BaseRepository
 from courses.models import Course
 
+#Only Name sorting is supported (by design - see common.utils.apply_ordering()).
+ORDERING_FIELDS = {
+    "name": ("name",),
+}
+DEFAULT_ORDERING = "name"
+
 
 class CourseRepository(BaseRepository):
     def __init__(self):
         super().__init__(Course)
 
     def get_queryset_for_list(self, search = None):
+        #No .order_by() here - final ordering is applied by the service via
+        #common.utils.apply_ordering() (see ORDERING_FIELDS above).
         queryset = self.model.objects.select_related("department", "teacher").only(
             "id", "code", "name", "credits", "semester_number",
             "department__id", "department__name",
             "teacher__id", "teacher__first_name", "teacher__last_name",
-        ).order_by("id")
+        )
 
         if search:
             for term in search.split():
@@ -25,7 +33,11 @@ class CourseRepository(BaseRepository):
         return queryset
 
     def get_queryset_for_reference(self, department_id = None, semester_number = None):
-        queryset = self.model.objects.select_related("department").only(
+        # Reference/dropdown use only (new-record selection) - see
+        # DepartmentRepository.get_queryset_for_reference for why is_active is
+        # filtered here but not in get_queryset_for_list(). Course has no
+        # is_deleted field, so is_active is the only exclusion needed.
+        queryset = self.model.objects.filter(is_active = True).select_related("department").only(
             "id", "name", "code", "semester_number", "department_id", "department__name",
         ).order_by("name")
 

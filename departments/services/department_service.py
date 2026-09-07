@@ -1,6 +1,7 @@
 from common.messages import Messages
-from common.utils import build_paginated_payload
+from common.utils import apply_ordering, build_paginated_payload
 from departments.mappers.department_mapper import DepartmentMapper
+from departments.repositories.department_repository import ORDERING_FIELDS
 
 
 class DepartmentService:
@@ -15,30 +16,33 @@ class DepartmentService:
     def get(self, department_id):
         return self.repository.get(department_id)
 
-    #Serves the real React/API list flow: GET /api/departments/?page=&page_size=&search=
-    #page and page_size must already be normalized (common.utils.resolve_pagination_params).
-    def get_list(self, user, search, page, page_size):
+    #Serves the real React/API list flow: GET /api/departments/?page=&page_size=&search=&ordering=
+    #page, page_size and ordering must already be normalized (common.utils.resolve_pagination_params/
+    #resolve_ordering_param).
+    def get_list(self, user, search, page, page_size, ordering = None):
         scope_token = self.cache.scope_token_for(user)
+        filters = {"ordering": ordering}
 
         def loader():
             queryset = self.repository.get_queryset_for_list(search = search)
+            queryset = apply_ordering(queryset, ordering, ORDERING_FIELDS)
             return build_paginated_payload(queryset, page, page_size, DepartmentMapper.to_list_dto)
 
-        return self.cache.get_or_load_list(scope_token, search, page, page_size, loader)
+        return self.cache.get_or_load_list(scope_token, search, page, page_size, loader, filters = filters)
 
     #Serves the dropdown/reference flow: GET /api/departments/reference/
     #Used by 7 call sites across 6 admin pages, so this is the highest-value
     #department cache. Same rows as get_list(), narrower projection, hence the
     #variant filter - see DepartmentCache.REFERENCE_FILTERS.
-    def get_reference_list(self, user, page, page_size):
+    def get_reference_list(self, user, page, page_size, search = None):
         scope_token = self.cache.scope_token_for(user)
 
         def loader():
-            queryset = self.repository.get_queryset_for_reference()
+            queryset = self.repository.get_queryset_for_reference(search = search)
             return build_paginated_payload(queryset, page, page_size, DepartmentMapper.to_reference_dto)
 
         return self.cache.get_or_load_list(
-            scope_token, None, page, page_size, loader,
+            scope_token, search, page, page_size, loader,
             filters = self.cache.REFERENCE_FILTERS,
         )
 

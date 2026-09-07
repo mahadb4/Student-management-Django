@@ -48,22 +48,7 @@ def _create_own_profile(user, profile):
     return None
 
 from common.utils import paginate_queryset
-
-
-def serialize_user(user):
-    student = getattr(user, "student_profile", None)
-    teacher = getattr(user, "teacher_profile", None)
-
-    return {
-        "id": user.id,
-        "name": user.name,
-        "email": user.email,
-        "role": user.role,
-        "status": user.status,
-        "permissions": [],
-        "student_id": student.id if student else None,
-        "teacher_id": teacher.id if teacher else None,
-    }
+from users.mappers.user_mapper import UserMapper
 
 
 # The one authenticated-identity name shown to the client (Navbar, stored
@@ -72,9 +57,9 @@ def serialize_user(user):
 # registration) is the maintained source of truth for a Student/Teacher's
 # actual name elsewhere in the app (e.g. GET /students/me/). Only used at
 # login/onboarding, where the client's cached identity is (re)issued -
-# serialize_user itself is left untouched since it's also used by the
-# Admin-facing user list/register/approval responses, which show the
-# registered account name regardless of profile linkage.
+# UserMapper.to_detail_dto itself is left untouched since it's also used by
+# the Admin-facing register/approval responses, which show the registered
+# account name regardless of profile linkage.
 def resolve_authenticated_display_name(user):
     student = getattr(user, "student_profile", None)
     if student:
@@ -97,10 +82,10 @@ def user_api(request, user_id = None):
         if request.method == "GET":
             if user_id is not None:
                 user = user_service.get(user_id)
-                return JsonResponse(serialize_user(user))
+                return JsonResponse(UserMapper.to_detail_dto(user))
 
             users = user_service.get_all()
-            return paginate_queryset(request, users, serialize_user)
+            return paginate_queryset(request, users, UserMapper.to_list_dto)
 
         return JsonResponse(
             {"error": Messages.METHOD_NOT_ALLOWED},
@@ -133,7 +118,7 @@ def register_api(request):
         return JsonResponse(
             {
                 "message": Messages.USER_REGISTRATION_SUCCESSFUL,
-                "user": serialize_user(user),
+                "user": UserMapper.to_detail_dto(user),
             },
             status = 201,
         )
@@ -167,7 +152,7 @@ def login_api(request):
 
         result = user_service.login(data)
 
-        user_payload = serialize_user(result["user"])
+        user_payload = UserMapper.to_detail_dto(result["user"])
         user_payload["name"] = resolve_authenticated_display_name(result["user"])
 
         return JsonResponse(
@@ -209,7 +194,7 @@ def approve_user_api(request, user_id):
         return JsonResponse(
             {
                 "message": Messages.USER_APPROVED_SUCCESSFULLY,
-                "user": serialize_user(user),
+                "user": UserMapper.to_detail_dto(user),
             }
         )
 
@@ -235,7 +220,7 @@ def reject_user_api(request, user_id):
         return JsonResponse(
             {
                 "message": Messages.USER_REJECTED_SUCCESSFULLY,
-                "user": serialize_user(user),
+                "user": UserMapper.to_detail_dto(user),
             }
         )
 
@@ -291,7 +276,7 @@ def pending_users_api(request):
         )
 
     users = user_service.get_pending()
-    return paginate_queryset(request, users, serialize_user)
+    return paginate_queryset(request, users, UserMapper.to_list_dto)
 
 
 def me_api(request):
@@ -314,7 +299,7 @@ def me_api(request):
         user, _ = authentication_result
 
         return JsonResponse(
-            {"user": serialize_user(user)}
+            {"user": UserMapper.to_detail_dto(user)}
         )
 
     except Exception:
@@ -364,7 +349,7 @@ def complete_onboarding_api(request):
         with transaction.atomic():
             _create_own_profile(user, data)
 
-        user_payload = serialize_user(user)
+        user_payload = UserMapper.to_detail_dto(user)
         user_payload["name"] = resolve_authenticated_display_name(user)
 
         return JsonResponse(

@@ -2,16 +2,26 @@ from django.db.models import Q
 from common.repositories.base_repository import BaseRepository
 from teachers.models import Teacher
 
+#Only Name sorting is supported (by design - see common.utils.apply_ordering()).
+#"name" isn't a real DB column (TeacherListDTO computes it from first/last), so
+#it maps to the actual underlying fields here.
+ORDERING_FIELDS = {
+    "name": ("first_name", "last_name"),
+}
+DEFAULT_ORDERING = "name"
+
 
 class TeacherRepository(BaseRepository):
     def __init__(self):
         super().__init__(Teacher)
 
-    def get_queryset_for_list(self, search = None):
+    def get_queryset_for_list(self, search = None, department_id = None):
+        #No .order_by() here - final ordering is applied by the service, after
+        #apply_data_scope(), via common.utils.apply_ordering() (see ORDERING_FIELDS above).
         queryset = self.model.objects.select_related("department").only(
             "id", "employee_id", "first_name", "last_name", "email", "designation",
             "department__id", "department__name",
-        ).order_by("id")
+        )
 
         if search:
             for term in search.split():
@@ -23,10 +33,16 @@ class TeacherRepository(BaseRepository):
                     | Q(designation__icontains = term)
                 )
 
+        if department_id is not None:
+            queryset = queryset.filter(department_id = department_id)
+
         return queryset
 
     def get_queryset_for_reference(self, department_id = None):
-        queryset = self.model.objects.filter(is_deleted = False).only(
+        # Reference/dropdown use only (new-record selection) - see
+        # DepartmentRepository.get_queryset_for_reference for why is_active is
+        # filtered here but not in get_queryset_for_list().
+        queryset = self.model.objects.filter(is_deleted = False, is_active = True).only(
             "id", "first_name", "last_name", "department_id",
         ).order_by("first_name", "last_name")
 

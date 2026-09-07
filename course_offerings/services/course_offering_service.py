@@ -1,7 +1,8 @@
 from common.messages import Messages
 from common.permissions import apply_data_scope, get_scope_identity
-from common.utils import build_paginated_payload
+from common.utils import apply_ordering, build_paginated_payload
 from course_offerings.mappers.course_offering_mapper import CourseOfferingMapper
+from course_offerings.repositories.course_offering_repository import ORDERING_FIELDS
 
 
 class CourseOfferingService:
@@ -19,13 +20,14 @@ class CourseOfferingService:
     #GET /api/course_offerings/?page=&page_size=&search=&section_id=
     #Scoped per user: admin sees all, a teacher their own, a student those they
     #are enrolled in.
-    def get_list(self,user,search,section_id,page,page_size):
+    def get_list(self,user,search,section_id,page,page_size,active_only=False,ordering=None):
         scope_token = self.cache.scope_token_for(user)
-        filters = {"section_id": section_id}
+        filters = {"section_id": section_id, "active_only": active_only, "ordering": ordering}
 
         def loader():
-            queryset = self.repository.get_queryset_for_list(search = search, section_id = section_id)
+            queryset = self.repository.get_queryset_for_list(search = search, section_id = section_id, active_only = active_only)
             queryset = apply_data_scope(user,queryset,'courseoffering')
+            queryset = apply_ordering(queryset,ordering,ORDERING_FIELDS)
             return build_paginated_payload(queryset,page,page_size,CourseOfferingMapper.to_list_dto)
 
         return self.cache.get_or_load_list(
@@ -48,10 +50,46 @@ class CourseOfferingService:
             queryset = self._reference_queryset(user,search)
             return build_paginated_payload(queryset,page,page_size,CourseOfferingMapper.to_reference_dto)
 
-        return self.cache.get_or_load_list(
+        payload = self.cache.get_or_load_list(
             scope_token,search,page,page_size,loader,
             filters = self.cache.REFERENCE_FILTERS,
         )
+
+        return self._exclude_already_enrolled(user,payload)
+
+    #The student branch of this endpoint is cached per SECTION, not per student
+    #(see CourseOfferingCache.reference_scope_token_for - deliberate, so every
+    #student in a section shares one cached payload). Excluding this student's
+    #own already-enrolled offerings therefore can't happen inside the cached
+    #loader() above without losing that sharing - it's applied here instead,
+    #AFTER the (possibly cached) payload is retrieved, using a fresh per-request
+    #lookup of just this student's own enrolled course_offering ids. This never
+    #touches the cache entry itself, and mirrors the same "already enrolled"
+    #definition enrollment_repository.enrollment_exists() already uses
+    #(any non-deleted enrollment row, regardless of status).
+    def _exclude_already_enrolled(self,user,payload):
+        kind,profile = get_scope_identity(user)
+
+        if kind != "student" or profile is None:
+            return payload
+
+        from enrollments.models import Enrollment
+
+        enrolled_offering_ids = set(
+            Enrollment.objects.filter(
+                student_id = profile.id, is_deleted = False,
+            ).values_list("course_offering_id",flat = True)
+        )
+
+        if not enrolled_offering_ids:
+            return payload
+
+        return {
+            **payload,
+            "results": [
+                row for row in payload["results"] if row["id"] not in enrolled_offering_ids
+            ],
+        }
 
     def _reference_queryset(self,user,search):
         kind,profile = get_scope_identity(user)
