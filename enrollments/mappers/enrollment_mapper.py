@@ -15,8 +15,8 @@ class EnrollmentMapper:
         return EnrollmentListDTO(
             id = enrollment.id,
             status = enrollment.status,
-            student_name = f"{enrollment.student.first_name} {enrollment.student.last_name}",
-            student_email = enrollment.student.student_email,
+            student_name = f"{enrollment.student.effective_first_name} {enrollment.student.effective_last_name}",
+            student_email = enrollment.student.effective_email,
             semester = enrollment.course_offering.semester,
             academic_year = enrollment.course_offering.academic_year,
             course_name = enrollment.course_offering.course.name,
@@ -38,7 +38,7 @@ class EnrollmentMapper:
         )
 
         teacher_name = (
-            f"{enrollment.course_offering.teacher.first_name} {enrollment.course_offering.teacher.last_name}"
+            f"{enrollment.course_offering.teacher.effective_first_name} {enrollment.course_offering.teacher.effective_last_name}"
             if enrollment.course_offering.teacher_id else None
         )
 
@@ -79,8 +79,8 @@ class EnrollmentMapper:
 
         return EnrollmentTeacherListDTO(
             enrollment_id = enrollment.id,
-            student_name = f"{enrollment.student.first_name} {enrollment.student.last_name}",
-            student_email = enrollment.student.student_email,
+            student_name = f"{enrollment.student.effective_first_name} {enrollment.student.effective_last_name}",
+            student_email = enrollment.student.effective_email,
             course_name = enrollment.course_offering.course.name,
             course_code = enrollment.course_offering.course.code,
             section_name = section_name,

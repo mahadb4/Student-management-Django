@@ -1,8 +1,13 @@
+from django.contrib.auth.models import Group
+from django.db import transaction
 from common.messages import Messages
 from common.permissions import apply_data_scope
-from common.utils import apply_ordering, build_paginated_payload
+from common.utils import apply_ordering, build_full_name, build_paginated_payload
 from teachers.mappers.teacher_mapper import TeacherMapper
 from teachers.repositories.teacher_repository import ORDERING_FIELDS
+from users.models import User
+
+DEFAULT_TEMP_PASSWORD = "Abcd1234"
 
 class TeacherService:
     #cache is a TeacherCache (teachers/cache/teacher_cache.py), not a raw CacheService.
@@ -36,21 +41,34 @@ class TeacherService:
     #React frontend never requests. Real list caching is get_list().
     def get_all(self): return self.repository.get_all()
 
-    def create(self,data):
+    #user: an already-authenticated User to link (onboarding). Omit to have
+    #a new User created for this Teacher (direct admin creation) - either
+    #way, the Teacher is never saved without one.
+    def create(self,data,user = None):
         if not isinstance(data,dict): raise ValueError(Messages.REQUEST_DATA_MUST_BE_JSON_OBJECT)
 
-        self.validator.validate(data)
+        self.validator.validate(data, exclude_user_id = user.id if user else None)
 
         email = data["email"].strip()
         employee_id = data["employee_id"].strip()
 
-        if self.repository.email_exists(email):
-            raise ValueError(Messages.EMAIL_ALREADY_EXISTS.format(email))
-
         if self.repository.employee_id_exists(employee_id):
             raise ValueError(Messages.EMPLOYEE_ID_EXISTS.format(employee_id))
 
-        result = self.repository.create(data)
+        with transaction.atomic():
+            if user is None:
+                user = User.objects.create_user(
+                    email = email,
+                    name = build_full_name(data["first_name"], data["last_name"]),
+                    password = DEFAULT_TEMP_PASSWORD,
+                    role = "teacher",
+                    status = "approved",
+                )
+                group, _ = Group.objects.get_or_create(name = "TEACHER")
+                user.groups.add(group)
+
+            result = self.repository.create(data,user)
+
         self.cache.invalidate_on_write()
         return result
 
@@ -61,12 +79,12 @@ class TeacherService:
 
         if partial: data = self._merge_data(teacher,data)
 
-        self.validator.validate(data,teacher_id)
+        self.validator.validate(data,teacher_id,exclude_user_id = teacher.user_id)
 
         email = data["email"].strip()
         employee_id = data["employee_id"].strip()
 
-        if self.repository.email_exists(email,teacher_id):
+        if User.objects.filter(email__iexact = email).exclude(id = teacher.user_id).exists():
             raise ValueError(Messages.EMAIL_ALREADY_EXISTS.format(email))
 
         if self.repository.employee_id_exists(employee_id,teacher_id):
@@ -83,10 +101,10 @@ class TeacherService:
 
     def _merge_data(self,teacher,data):
         return {
-            "first_name":data.get("first_name",teacher.first_name),
-            "last_name":data.get("last_name",teacher.last_name),
+            "first_name":data.get("first_name",teacher.effective_first_name),
+            "last_name":data.get("last_name",teacher.effective_last_name),
             "employee_id":data.get("employee_id",teacher.employee_id),
-            "email":data.get("email",teacher.email),
+            "email":data.get("email",teacher.effective_email),
             "phone_number":data.get("phone_number",teacher.phone_number),
             "department":data.get("department",teacher.department_id),
             "designation":data.get("designation",teacher.designation),

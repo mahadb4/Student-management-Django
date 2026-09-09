@@ -1,10 +1,14 @@
 import hashlib
-from typing import Any, Callable, Optional
+from typing import Any, Callable, Generic, Optional
 
-
-#Generic caching pattern for a single entity type: key composition, TTL policy,
-#read-through loading and invalidation. Knows nothing about any specific model.
-#Subclass it per app and set the namespace (see students/cache/student_cache.py).
+# Generic caching logic.
+# It knows:
+# how to create keys
+# how to cache details
+# how to cache lists
+# TTL
+# invalidation
+# But it doesn't know anything specifically about students.
 class BaseEntityCache:
 
     def __init__(
@@ -14,11 +18,7 @@ class BaseEntityCache:
         detail_timeout: Optional[int] = None,
         list_timeout: Optional[int] = 60,
     ):
-        #namespace "student" produces keys "student:44" and "student:list:..."
-        #detail_timeout None means cache forever; detail keys are invalidated
-        #explicitly on write, so they never go stale silently.
-        #list_timeout is deliberately short: list payloads depend on scope,
-        #search and pagination, so a small TTL bounds staleness cheaply.
+    
         self.cache = cache_service
         self.namespace = namespace
         self.detail_timeout = detail_timeout
@@ -64,11 +64,7 @@ class BaseEntityCache:
 
         return hashlib.md5(normalized.encode("utf-8")).hexdigest()[:10]
 
-    #Canonicalizes an extra-filter mapping into one stable token.
-    #Keys are sorted and unset (None) values dropped, so {"a": 1, "b": None} and
-    #{"b": None, "a": 1} and {"a": 1} all share a cache entry - they select the
-    #same rows. Values are stringified, so 3 and "3" also agree (query-string
-    #params arrive as strings, service callers may pass ints).
+
     @staticmethod
     def _filters_token(filters: Optional[dict]) -> str:
         if not filters:
@@ -83,13 +79,11 @@ class BaseEntityCache:
 
         return hashlib.md5(canonical.encode("utf-8")).hexdigest()[:10]
 
-    #READ-THROUGH
-
+  
+    # loader = a function that knows how to fetch the data when the cache doesn't have it.
     def get_or_load_detail(self, object_id: Any, loader: Callable[[], Any]) -> Any:
         return self.cache.get_or_set(self.detail_key(object_id), loader, self.detail_timeout)
 
-    #loader must return an already-serialized, plain payload (dict/list), not a
-    #lazy queryset, so the cached value is meaningful on its own.
     def get_or_load_list(
         self,
         scope_token: str,

@@ -42,15 +42,17 @@ class StudentOfferingDiscoveryTests(TestCase):
             email = "s1@example.com", name = "S One", password = "x", role = "student",
         )
         self.student = Student.objects.create(
-            user = self.user, first_name = "S", last_name = "One",
-            student_email = "s1@example.com", parents_phone_number = "1",
+            user = self.user, parents_phone_number = "1234567",
             date_of_birth = date(2000, 1, 1), gender = "M",
             department = self.department, section = self.section,
         )
 
+        self.teacher_user = User.objects.create_user(
+            email = "t1@example.com", name = "T One", password = "x", role = "teacher",
+        )
         self.teacher = Teacher.objects.create(
-            first_name = "T", last_name = "One", employee_id = "E1",
-            email = "t1@example.com", phone_number = "1", department = self.department,
+            user = self.teacher_user, employee_id = "E1",
+            phone_number = "1234567", department = self.department,
             designation = "Lecturer", qualification = "MSc", gender = "M",
             date_of_birth = date(1980, 1, 1), date_of_joining = date(2020, 1, 1), salary = 1,
         )
@@ -271,17 +273,15 @@ class StudentOfferingDiscoveryTests(TestCase):
             {self.enrolled_offering.id, self.available_offering.id, self.other_section_offering.id},
         )
 
-        foreign_teacher = Teacher.objects.create(
-            first_name = "T", last_name = "Two", employee_id = "E2",
-            email = "t2@example.com", phone_number = "1", department = self.department,
-            designation = "Lecturer", qualification = "MSc", gender = "M",
-            date_of_birth = date(1980, 1, 1), date_of_joining = date(2020, 1, 1), salary = 1,
-        )
         foreign_user = User.objects.create_user(
             email = "t2u@example.com", name = "T Two", password = "x", role = "teacher",
         )
-        foreign_teacher.user = foreign_user
-        foreign_teacher.save(update_fields = ["user"])
+        Teacher.objects.create(
+            user = foreign_user, employee_id = "E2",
+            phone_number = "1234567", department = self.department,
+            designation = "Lecturer", qualification = "MSc", gender = "M",
+            date_of_birth = date(1980, 1, 1), date_of_joining = date(2020, 1, 1), salary = 1,
+        )
 
         foreign_payload = self.service.get_reference_list(foreign_user, None, 1, 100)
 

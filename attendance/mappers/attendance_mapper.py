@@ -16,7 +16,7 @@ class AttendanceMapper:
             status = attendance.status,
             remarks = attendance.remarks,
             enrollment_id = attendance.enrollment_id if has_enrollment else None,
-            student_name = f"{attendance.enrollment.student.first_name} {attendance.enrollment.student.last_name}" if has_enrollment else None,
+            student_name = f"{attendance.enrollment.student.effective_first_name} {attendance.enrollment.student.effective_last_name}" if has_enrollment else None,
             course_code = attendance.enrollment.course_offering.course.code if has_enrollment else None,
         ).to_dict()
 
@@ -51,5 +51,5 @@ class AttendanceMapper:
             status = attendance.status,
             remarks = attendance.remarks,
             enrollment_id = attendance.enrollment_id if has_enrollment else None,
-            student_name = f"{attendance.enrollment.student.first_name} {attendance.enrollment.student.last_name}" if has_enrollment else None,
+            student_name = f"{attendance.enrollment.student.effective_first_name} {attendance.enrollment.student.effective_last_name}" if has_enrollment else None,
         ).to_dict()
