@@ -10,7 +10,7 @@ class CourseOfferingMapper:
         course_code = offering.course.code if offering.course_id else None
 
         teacher_name = (
-            f"{offering.teacher.first_name} {offering.teacher.last_name}"
+            f"{offering.teacher.effective_first_name} {offering.teacher.effective_last_name}"
             if offering.teacher_id else None
         )
 
@@ -36,7 +36,7 @@ class CourseOfferingMapper:
         course_code = offering.course.code if offering.course_id else None
 
         teacher_name = (
-            f"{offering.teacher.first_name} {offering.teacher.last_name}"
+            f"{offering.teacher.effective_first_name} {offering.teacher.effective_last_name}"
             if offering.teacher_id else None
         )
 

@@ -1,12 +1,12 @@
+from django.db import transaction
 from django.db.models import Q
 from common.repositories.base_repository import BaseRepository
+from common.utils import build_full_name
 from teachers.models import Teacher
 
 #Only Name sorting is supported (by design - see common.utils.apply_ordering()).
-#"name" isn't a real DB column (TeacherListDTO computes it from first/last), so
-#it maps to the actual underlying fields here.
 ORDERING_FIELDS = {
-    "name": ("first_name", "last_name"),
+    "name": ("user__name",),
 }
 DEFAULT_ORDERING = "name"
 
@@ -15,22 +15,27 @@ class TeacherRepository(BaseRepository):
     def __init__(self):
         super().__init__(Teacher)
 
+    def get(self, object_id):
+        return self.model.objects.select_related("user").get(
+            id = object_id, is_deleted = False,
+        )
+
     def get_queryset_for_list(self, search = None, department_id = None):
         #No .order_by() here - final ordering is applied by the service, after
         #apply_data_scope(), via common.utils.apply_ordering() (see ORDERING_FIELDS above).
-        queryset = self.model.objects.select_related("department").only(
-            "id", "employee_id", "first_name", "last_name", "email", "designation",
+        queryset = self.model.objects.select_related("department", "user").only(
+            "id", "employee_id", "designation",
+            "user_id", "user__name", "user__email",
             "department__id", "department__name",
         )
 
         if search:
             for term in search.split():
                 queryset = queryset.filter(
-                    Q(first_name__icontains = term)
-                    | Q(last_name__icontains = term)
-                    | Q(email__icontains = term)
-                    | Q(employee_id__icontains = term)
+                    Q(employee_id__icontains = term)
                     | Q(designation__icontains = term)
+                    | Q(user__name__icontains = term)
+                    | Q(user__email__icontains = term)
                 )
 
         if department_id is not None:
@@ -42,25 +47,16 @@ class TeacherRepository(BaseRepository):
         # Reference/dropdown use only (new-record selection) - see
         # DepartmentRepository.get_queryset_for_reference for why is_active is
         # filtered here but not in get_queryset_for_list().
-        queryset = self.model.objects.filter(is_deleted = False, is_active = True).only(
-            "id", "first_name", "last_name", "department_id",
-        ).order_by("first_name", "last_name")
+        queryset = self.model.objects.select_related("user").filter(
+            is_deleted = False, is_active = True,
+        ).only(
+            "id", "department_id", "user_id", "user__name", "user__email",
+        ).order_by("user__name")
 
         if department_id is not None:
             queryset = queryset.filter(department_id = department_id)
 
         return queryset
-
-    def email_exists(self, email, exclude_id = None):
-        query = self.model.objects.filter(
-            email__iexact = email,
-            is_deleted = False,
-        )
-
-        if exclude_id is not None:
-            query = query.exclude(id = exclude_id)
-
-        return query.exists()
 
     def employee_id_exists(self, employee_id, exclude_id = None):
         query = self.model.objects.filter(
@@ -73,22 +69,31 @@ class TeacherRepository(BaseRepository):
 
         return query.exists()
 
-    def create(self, data):
-        teacher = self.model()
+    def create(self, data, user):
+        teacher = self.model(user = user)
         self.fill(teacher, data)
         teacher.save()
         return teacher
 
     def update(self, teacher, data):
-        self.fill(teacher, data)
-        teacher.save()
+        with transaction.atomic():
+            self.fill(teacher, data)
+            teacher.save()
         return teacher
 
     def fill(self, teacher, data):
-        teacher.first_name = data["first_name"].strip()
-        teacher.last_name = data["last_name"].strip()
+        first_name = data["first_name"].strip()
+        last_name = data["last_name"].strip()
+        email = data["email"].strip()
+
+        full_name = build_full_name(first_name, last_name)
+        user = teacher.user
+        if user.name != full_name or user.email != email:
+            user.name = full_name
+            user.email = email
+            user.save(update_fields = ["name", "email"])
+
         teacher.employee_id = data["employee_id"].strip()
-        teacher.email = data["email"].strip()
         teacher.phone_number = data["phone_number"].strip()
         teacher.department_id = data["department"]
         teacher.designation = data["designation"].strip()

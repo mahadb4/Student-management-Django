@@ -12,7 +12,7 @@ class CourseMapper:
             credits = course.credits,
             semester_number = course.semester_number,
             department_name = course.department.name if course.department_id else None,
-            teacher_name = f"{course.teacher.first_name} {course.teacher.last_name}" if course.teacher_id else None,
+            teacher_name = f"{course.teacher.effective_first_name} {course.teacher.effective_last_name}" if course.teacher_id else None,
         ).to_dict()
 
     @staticmethod

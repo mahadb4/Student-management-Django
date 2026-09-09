@@ -32,43 +32,20 @@ teacher_service = TeacherService(TeacherValidator(), TeacherRepository(), Teache
 
 
 def _create_own_profile(user, profile):
-    # Onboarding profile creation: the email/role identity comes from the
-    # already-authenticated User, never from the submitted payload, so a
-    # user can only ever create and link a profile for themself.
+    # Email/role come from the authenticated User, not the payload, so a
+    # user can only create a profile for themself.
     if user.role == "student":
-        student = student_service.create({**profile, "student_email": user.email})
-        student.user = user
-        student.save(update_fields = ["user"])
-        return student
+        return student_service.create({**profile, "student_email": user.email}, user = user)
     if user.role == "teacher":
-        teacher = teacher_service.create({**profile, "email": user.email})
-        teacher.user = user
-        teacher.save(update_fields = ["user"])
-        return teacher
+        return teacher_service.create({**profile, "email": user.email}, user = user)
     return None
 
 from common.utils import paginate_queryset
 from users.mappers.user_mapper import UserMapper
 
 
-# The one authenticated-identity name shown to the client (Navbar, stored
-# localStorage user) - resolved from the linked Student/Teacher profile when
-# one exists, since that profile (not the standalone User.name set at
-# registration) is the maintained source of truth for a Student/Teacher's
-# actual name elsewhere in the app (e.g. GET /students/me/). Only used at
-# login/onboarding, where the client's cached identity is (re)issued -
-# UserMapper.to_detail_dto itself is left untouched since it's also used by
-# the Admin-facing register/approval responses, which show the registered
-# account name regardless of profile linkage.
+# Display name shown to the client (Navbar). Used at login/onboarding.
 def resolve_authenticated_display_name(user):
-    student = getattr(user, "student_profile", None)
-    if student:
-        return f"{student.first_name} {student.last_name}"
-
-    teacher = getattr(user, "teacher_profile", None)
-    if teacher:
-        return f"{teacher.first_name} {teacher.last_name}"
-
     return user.name
 
 

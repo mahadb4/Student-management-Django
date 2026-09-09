@@ -21,9 +21,9 @@ from students.repositories.student_repository import DEFAULT_ORDERING, ORDERING_
 def serialize_student(student):
     return {
         "id": student.id,
-        "first_name": student.first_name,
-        "last_name": student.last_name,
-        "student_email": student.student_email,
+        "first_name": student.effective_first_name,
+        "last_name": student.effective_last_name,
+        "student_email": student.effective_email,
         "parents_phone_number": student.parents_phone_number,
         "date_of_birth": str(student.date_of_birth),
         "gender": student.gender,
@@ -139,9 +139,9 @@ def student_reference_api(request):
 def serialize_student_profile(student):
     return {
         "id": student.id,
-        "first_name": student.first_name,
-        "last_name": student.last_name,
-        "student_email": student.student_email,
+        "first_name": student.effective_first_name,
+        "last_name": student.effective_last_name,
+        "student_email": student.effective_email,
         "parents_phone_number": student.parents_phone_number,
         "date_of_birth": str(student.date_of_birth),
         "gender": student.gender,

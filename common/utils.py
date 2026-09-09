@@ -4,6 +4,17 @@ from django.http import JsonResponse
 from common.messages import Messages
 
 
+#Splits a full name into (first_name, rest).
+def split_display_name(full_name):
+    parts = (full_name or "").strip().split(" ", 1)
+    return parts[0], (parts[1] if len(parts) > 1 else "")
+
+
+#Joins first_name/last_name into a single display name.
+def build_full_name(first_name, last_name):
+    return f"{(first_name or '').strip()} {(last_name or '').strip()}".strip()
+
+
 def parse_json_request(request):
     try:
         if not request.body:

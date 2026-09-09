@@ -20,10 +20,10 @@ from common.utils import paginate_queryset, resolve_ordering_param, resolve_pagi
 def serialize_teacher_profile(teacher):
     return {
         "id": teacher.id,
-        "first_name": teacher.first_name,
-        "last_name": teacher.last_name,
+        "first_name": teacher.effective_first_name,
+        "last_name": teacher.effective_last_name,
         "employee_id": teacher.employee_id,
-        "email": teacher.email,
+        "email": teacher.effective_email,
         "department_name": teacher.department.name if teacher.department_id else None,
         "designation": teacher.designation,
     }
@@ -32,10 +32,10 @@ def serialize_teacher_profile(teacher):
 def serialize_teacher(teacher):
     return {
         "id": teacher.id,
-        "first_name": teacher.first_name,
-        "last_name": teacher.last_name,
+        "first_name": teacher.effective_first_name,
+        "last_name": teacher.effective_last_name,
         "employee_id": teacher.employee_id,
-        "email": teacher.email,
+        "email": teacher.effective_email,
         "phone_number": teacher.phone_number,
         "department": teacher.department_id,
         "designation": teacher.designation,

@@ -200,7 +200,7 @@ class Command(BaseCommand):
             home_dept = departments.get(pool_spec["home_department"])
             created_teachers = []
             for idx, (first, last, email) in enumerate(pool_spec["teachers"]):
-                teacher = Teacher.objects.filter(email = email).first()
+                teacher = Teacher.objects.filter(user__email__iexact = email).first()
                 if teacher:
                     self.reused["teachers"] += 1
                     created_teachers.append(teacher)
@@ -210,11 +210,22 @@ class Command(BaseCommand):
                 self.created["teachers"] += 1
                 teacher = _DryRunPlaceholder(first_name = first, last_name = last)
                 if apply and home_dept:
+                    user = User.objects.filter(email__iexact = email).first()
+                    if not user:
+                        self.created["users"] += 1
+                        user = User.objects.create_user(
+                            email = email,
+                            name = f"{first} {last}",
+                            password = DEFAULT_PASSWORD,
+                            role = "teacher",
+                            status = "approved",
+                        )
+                        group, _ = Group.objects.get_or_create(name = "TEACHER")
+                        user.groups.add(group)
+
                     teacher = Teacher.objects.create(
-                        first_name = first,
-                        last_name = last,
+                        user = user,
                         employee_id = f"EMP-{home_dept.code}-{code}-{idx + 1:03d}",
-                        email = email,
                         phone_number = "0000000000",
                         department = home_dept,
                         designation = "Lecturer",
@@ -224,30 +235,10 @@ class Command(BaseCommand):
                         salary = 100000,
                         is_active = True,
                     )
-                    self._ensure_user_for(teacher, "email", f"{first} {last}", "teacher", apply)
                 created_teachers.append(teacher)
 
             pools[code] = created_teachers
         return pools
-
-    def _ensure_user_for(self, profile, email_field, display_name, role, apply):
-        email = getattr(profile, email_field)
-        user = User.objects.filter(email__iexact = email).first()
-        if not user:
-            self.created["users"] += 1
-            if apply:
-                user = User.objects.create_user(
-                    email = email,
-                    name = display_name,
-                    password = DEFAULT_PASSWORD,
-                    role = role,
-                    status = "approved",
-                )
-                group, _ = Group.objects.get_or_create(name = role.upper())
-                user.groups.add(group)
-        if apply and user and not profile.user_id:
-            profile.user = user
-            profile.save(update_fields = ["user"])
 
     def _target_sections(self, dept):
         return list(
@@ -365,9 +356,13 @@ class Command(BaseCommand):
                         self.reused["offerings"] += 1
                         continue
 
+                    teacher_label = (
+                        f"{teacher.first_name} {teacher.last_name}"
+                        if hasattr(teacher, "first_name") else str(teacher)
+                    )
                     self.stdout.write(
                         f"  CREATE offering {code} -> {dept_name} Sem1 {section.name} "
-                        f"(teacher {teacher.first_name} {teacher.last_name})"
+                        f"(teacher {teacher_label})"
                     )
                     self.created["offerings"] += 1
                     if apply:

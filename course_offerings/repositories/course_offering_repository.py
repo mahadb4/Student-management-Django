@@ -38,10 +38,11 @@ class CourseOfferingRepository(BaseRepository):
         # below, which is out of scope for sorting). CourseOfferingService.get_list()
         # calls common.utils.apply_ordering() on the result, which fully replaces
         # this with the requested ordering (see ORDERING_FIELDS above).
-        queryset = self.model.objects.select_related("course", "teacher", "section").only(
+        queryset = self.model.objects.select_related("course", "teacher", "teacher__user", "section").only(
             "id", "semester", "academic_year", "is_active",
             "course__id", "course__name", "course__code",
-            "teacher__id", "teacher__first_name", "teacher__last_name",
+            "teacher__id",
+            "teacher__user_id", "teacher__user__name", "teacher__user__email",
             "section__id", "section__name",
         ).order_by("id")
 
@@ -50,8 +51,8 @@ class CourseOfferingRepository(BaseRepository):
                 queryset = queryset.filter(
                     Q(course__name__icontains = term)
                     | Q(course__code__icontains = term)
-                    | Q(teacher__first_name__icontains = term)
-                    | Q(teacher__last_name__icontains = term)
+                    | Q(teacher__user__name__icontains = term)
+                    | Q(teacher__user__email__icontains = term)
                     | Q(section__name__icontains = term)
                 )
 

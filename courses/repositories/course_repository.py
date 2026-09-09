@@ -16,10 +16,11 @@ class CourseRepository(BaseRepository):
     def get_queryset_for_list(self, search = None):
         #No .order_by() here - final ordering is applied by the service via
         #common.utils.apply_ordering() (see ORDERING_FIELDS above).
-        queryset = self.model.objects.select_related("department", "teacher").only(
+        queryset = self.model.objects.select_related("department", "teacher", "teacher__user").only(
             "id", "code", "name", "credits", "semester_number",
             "department__id", "department__name",
-            "teacher__id", "teacher__first_name", "teacher__last_name",
+            "teacher__id",
+            "teacher__user_id", "teacher__user__name", "teacher__user__email",
         )
 
         if search:

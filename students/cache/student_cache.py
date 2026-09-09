@@ -5,8 +5,8 @@ from common.permissions import get_scope_identity
 #Student-specific cache policy. Everything generic lives in BaseEntityCache.
 class StudentCache(BaseEntityCache):
 
-    #Detail entries live until an explicit write invalidates them.
-    #List entries expire quickly because they depend on scope, search and paging.
+# Use student as my namespace, detail cache doesn't expire automatically,
+# list cache lasts 60 seconds, and student cache needs to know which user's scope we're dealing with.
     LIST_TIMEOUT_SECONDS = 60
 
     def __init__(self, cache_service):
@@ -17,10 +17,7 @@ class StudentCache(BaseEntityCache):
             list_timeout = self.LIST_TIMEOUT_SECONDS,
         )
 
-    #Identifies the viewer's data scope for cache keying.
-    #Delegates to get_scope_identity(), the same helper apply_data_scope() uses,
-    #so cache keys and authorization rules can never drift apart.
-    #Produces: "anon" | "all" | "teacher:<id>" | "student:<id>" | "none"
+    # What data is this user allowed to see?
     def scope_token_for(self, user) -> str:
         kind, profile = get_scope_identity(user)
 

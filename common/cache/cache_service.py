@@ -1,9 +1,10 @@
 from typing import Any, Callable, Optional
 from django.core.cache import cache
 
-
 _MISSING = object()
 
+# It actually communicates with Django's cache backend, which is Redis in our case
+# Low-level cache operations
 class CacheService:
 
     def __init__(self, client=cache):
@@ -21,9 +22,6 @@ class CacheService:
     def delete(self, key: str) -> None:
         self.client.delete(key)
 
-    #Deletes every key matching a glob pattern, e.g. "student:list:*".
-    #Raises instead of no-opping: a silent failure here means list invalidation
-    #stops working and stale pages are served with no visible symptom.
     def delete_pattern(self, pattern: str) -> int:
         if not hasattr(self.client, "delete_pattern"):
             raise NotImplementedError(
@@ -34,10 +32,14 @@ class CacheService:
 
         return self.client.delete_pattern(pattern)
 
+    # loader = a function that knows how to fetch the data when the cache doesn't have it.
     def get_or_set(
         self,
         key: str,
-        loader: Callable[[], Any],
+        # Callable basically means: "This thing can be called like a function
+        # The loader is a callable function that retrieves the data from the source
+        # usually the database, when the requested data is not found in the cache.
+        loader: Callable[[], Any], 
         timeout: Optional[int] = None
     ) -> Any:
         value = self.client.get(key, _MISSING)
