@@ -1,8 +1,9 @@
 from django.contrib.auth.models import Group
 from django.db import transaction
+from common.constants import MAX_PROFILE_PICTURE_SIZE_BYTES, PROFILE_PICTURE_URL_EXPIRY_SECONDS
 from common.messages import Messages
 from common.permissions import apply_data_scope
-from common.utils import apply_ordering, build_full_name, build_paginated_payload
+from common.utils import apply_ordering, build_full_name, build_paginated_payload, extension_for_content_type
 from students.mappers.student_mapper import StudentMapper
 from students.repositories.student_repository import ORDERING_FIELDS
 from users.models import User
@@ -96,15 +97,75 @@ class StudentService:
         self.cache.invalidate_on_write(student_id)
         return result
 
+    #Backend derives the key itself (students/<id>/profile.<ext>) - the caller
+    #only picks the content type. s3_service is passed in rather than stored on
+    #the instance so existing StudentService(validator, repository, cache)
+    #call sites/tests are unaffected.
+    def generate_profile_picture_upload_url(self,student_id,content_type,s3_service):
+        self.repository.get(student_id)  #raises Student.DoesNotExist if invalid
+
+        extension = extension_for_content_type(content_type)
+        key = f"students/{student_id}/profile.{extension}"
+        upload_url = s3_service.generate_upload_url(key,content_type,expires_in = PROFILE_PICTURE_URL_EXPIRY_SECONDS)
+
+        return {"upload_url":upload_url,"key":key,"content_type":content_type}
+
+    #Never trusts the frontend saying "upload succeeded" - verifies the object
+    #actually exists (and is within size limits) via head_object() before ever
+    #touching the database. The old object is only deleted AFTER the DB write
+    #for the new one succeeds.
+    def confirm_profile_picture_upload(self,student_id,key,s3_service):
+        student = self.repository.get(student_id)
+
+        expected_prefix = f"students/{student_id}/profile."
+        if not key or not key.startswith(expected_prefix):
+            raise ValueError(Messages.PROFILE_PICTURE_KEY_MISMATCH)
+
+        metadata = s3_service.head_object(key)
+        if metadata is None:
+            raise ValueError(Messages.PROFILE_PICTURE_UPLOAD_NOT_FOUND)
+
+        content_length = metadata.get("content_length") or 0
+        if content_length > MAX_PROFILE_PICTURE_SIZE_BYTES:
+            s3_service.delete_object(key)
+            raise ValueError(Messages.PROFILE_PICTURE_TOO_LARGE.format(MAX_PROFILE_PICTURE_SIZE_BYTES // (1024 * 1024)))
+
+        old_key = student.user.profile_picture_key
+        self.repository.update_profile_picture_key(student,key)
+        self.cache.invalidate_on_write(student_id)
+
+        if old_key and old_key != key:
+            s3_service.delete_object(old_key)
+
+        return student
+
+    #Fresh presigned URL every call - never stored in the DB, never stored in
+    #Redis (the cached detail entry only ever holds the Student model/key).
+    def get_profile_picture_view_url(self,student_id,s3_service):
+        student = self.get(student_id)
+        if not student.user.profile_picture_key:
+            return None
+
+        return s3_service.generate_view_url(student.user.profile_picture_key,expires_in = PROFILE_PICTURE_URL_EXPIRY_SECONDS)
+
+    def delete_profile_picture(self,student_id,s3_service):
+        student = self.repository.get(student_id)
+        if not student.user.profile_picture_key:
+            return
+
+        s3_service.delete_object(student.user.profile_picture_key)
+        self.repository.update_profile_picture_key(student,None)
+        self.cache.invalidate_on_write(student_id)
+
     def _merge_data(self,student,data):
         return {
             "first_name":data.get("first_name",student.effective_first_name),
             "last_name":data.get("last_name",student.effective_last_name),
             "student_email":data.get("student_email",student.effective_email),
             "parents_phone_number":data.get("parents_phone_number",student.parents_phone_number),
-            "date_of_birth":data.get("date_of_birth",student.date_of_birth),
-            "gender":data.get("gender",student.gender),
-            "address":data.get("address",student.address),
+            "date_of_birth":data.get("date_of_birth",student.user.date_of_birth),
+            "gender":data.get("gender",student.user.gender),
+            "address":data.get("address",student.user.address),
             "department":data.get("department",student.department_id),
             "section":data.get("section",student.section_id),
             "is_active":data.get("is_active",student.is_active),

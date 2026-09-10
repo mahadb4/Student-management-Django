@@ -25,7 +25,8 @@ class TeacherRepository(BaseRepository):
         #apply_data_scope(), via common.utils.apply_ordering() (see ORDERING_FIELDS above).
         queryset = self.model.objects.select_related("department", "user").only(
             "id", "employee_id", "designation",
-            "user_id", "user__name", "user__email",
+            "user_id", "user__name", "user__email", "user__date_of_birth",
+            "user__gender", "user__address", "user__profile_picture_key",
             "department__id", "department__name",
         )
 
@@ -81,6 +82,13 @@ class TeacherRepository(BaseRepository):
             teacher.save()
         return teacher
 
+    #The only writer of profile_picture_key. Bypasses fill()/validator since this
+    #is never part of the regular teacher create/update payload. Lives on User.
+    def update_profile_picture_key(self, teacher, key):
+        user = teacher.user
+        user.profile_picture_key = key
+        user.save(update_fields = ["profile_picture_key", "updated_at"])
+
     def fill(self, teacher, data):
         first_name = data["first_name"].strip()
         last_name = data["last_name"].strip()
@@ -88,19 +96,18 @@ class TeacherRepository(BaseRepository):
 
         full_name = build_full_name(first_name, last_name)
         user = teacher.user
-        if user.name != full_name or user.email != email:
-            user.name = full_name
-            user.email = email
-            user.save(update_fields = ["name", "email"])
+        user.name = full_name
+        user.email = email
+        user.date_of_birth = data["date_of_birth"]
+        user.gender = data["gender"]
+        user.address = (data.get("address") or "").strip()
+        user.save(update_fields = ["name", "email", "date_of_birth", "gender", "address"])
 
         teacher.employee_id = data["employee_id"].strip()
         teacher.phone_number = data["phone_number"].strip()
         teacher.department_id = data["department"]
         teacher.designation = data["designation"].strip()
         teacher.qualification = data["qualification"].strip()
-        teacher.gender = data["gender"]
-        teacher.date_of_birth = data["date_of_birth"]
         teacher.date_of_joining = data["date_of_joining"]
         teacher.salary = data["salary"]
-        teacher.address = (data.get("address") or "").strip()
         teacher.is_active = data.get("is_active", True) in (True, "on", "true", "True")

@@ -25,9 +25,11 @@ class StudentIdentityWritePathTests(TestCase):
         self.user = User.objects.create_user(
             email = "student@example.com", name = "Original Name", password = "x", role = "student",
         )
+        self.user.date_of_birth = date(2000, 1, 1)
+        self.user.gender = "M"
+        self.user.save(update_fields = ["date_of_birth", "gender"])
         self.student = Student.objects.create(
             user = self.user, parents_phone_number = "1234567",
-            date_of_birth = date(2000, 1, 1), gender = "M",
             department = self.department, section = self.section,
         )
 
@@ -87,8 +89,8 @@ class StudentIdentityWritePathTests(TestCase):
         data = self._base_data(first_name = "Changed", last_name = "Person")
         self.service.update(self.student.id, data)
 
-        student = Student.objects.get(id = self.student.id)
-        self.assertEqual(student.gender, "M")
+        student = Student.objects.select_related("user").get(id = self.student.id)
+        self.assertEqual(student.user.gender, "M")
         self.assertEqual(student.department_id, self.department.id)
         self.assertEqual(student.section_id, self.section.id)
         self.assertTrue(student.is_active)

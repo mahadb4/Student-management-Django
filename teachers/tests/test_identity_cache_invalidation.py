@@ -35,7 +35,7 @@ class TeacherIdentityCacheInvalidationTests(TestCase):
         self.teacher = Teacher.objects.create(
             user = self.user, employee_id = "CACHET1", phone_number = "1234567",
             department = self.department, designation = "Lecturer", qualification = "MSc",
-            gender = "M", date_of_birth = date(1980, 1, 1), date_of_joining = date(2020, 1, 1), salary = 1,
+            date_of_joining = date(2020, 1, 1), salary = 1,
         )
 
     def _full_update_data(self, teacher, **overrides):
@@ -48,11 +48,11 @@ class TeacherIdentityCacheInvalidationTests(TestCase):
             "department": teacher.department_id,
             "designation": teacher.designation,
             "qualification": teacher.qualification,
-            "gender": teacher.gender,
-            "date_of_birth": teacher.date_of_birth,
+            "gender": "M",
+            "date_of_birth": date(1980, 1, 1),
             "date_of_joining": teacher.date_of_joining,
             "salary": teacher.salary,
-            "address": teacher.address,
+            "address": teacher.user.address,
             "is_active": teacher.is_active,
         }
         data.update(overrides)
@@ -123,7 +123,6 @@ class TeacherIdentityCacheInvalidationTests(TestCase):
                 email = "cachestudentuntouched@example.com", name = "Untouched Student", password = "x", role = "student",
             ),
             parents_phone_number = "1234567",
-            date_of_birth = date(2000, 1, 1), gender = "M",
             department = self.department, section = section,
         )
         student_cache = StudentCache(CacheService())

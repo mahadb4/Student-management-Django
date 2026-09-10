@@ -11,11 +11,9 @@ class Teacher(models.Model):
     department = models.ForeignKey(Department,on_delete = models.PROTECT,related_name = "teachers")
     designation = models.CharField(max_length = 100)
     qualification = models.CharField(max_length = 100)
-    gender = models.CharField(max_length = 1,choices = [("M","Male"),("F","Female")])
-    date_of_birth = models.DateField()
     date_of_joining = models.DateField(default = timezone.now)
     salary = models.DecimalField(max_digits = 10,decimal_places = 2)
-    address = models.TextField(blank = True,null = True)
+
     is_active = models.BooleanField(default = True)
     is_deleted = models.BooleanField(default = False)
     created_at = models.DateTimeField(auto_now_add = True)

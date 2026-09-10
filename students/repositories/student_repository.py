@@ -28,7 +28,8 @@ class StudentRepository(BaseRepository):
             "department", "section", "user").only(
 
             "id", "is_active",
-            "user_id", "user__name", "user__email",
+            "user_id", "user__name", "user__email", "user__date_of_birth",
+            "user__gender", "user__address", "user__profile_picture_key",
             "department__id", "department__name",
             "section__id", "section__name",
 
@@ -69,6 +70,13 @@ class StudentRepository(BaseRepository):
             student.save()
         return student
 
+    #The only writer of profile_picture_key. Bypasses fill()/validator since this
+    #is never part of the regular student create/update payload. Lives on User.
+    def update_profile_picture_key(self, student, key):
+        user = student.user
+        user.profile_picture_key = key
+        user.save(update_fields = ["profile_picture_key", "updated_at"])
+
     def fill(self, student, data):
         first_name = data["first_name"].strip()
         last_name = data["last_name"].strip()
@@ -76,15 +84,14 @@ class StudentRepository(BaseRepository):
 
         full_name = build_full_name(first_name, last_name)
         user = student.user
-        if user.name != full_name or user.email != email:
-            user.name = full_name
-            user.email = email
-            user.save(update_fields = ["name", "email"])
+        user.name = full_name
+        user.email = email
+        user.date_of_birth = data["date_of_birth"]
+        user.gender = data["gender"]
+        user.address = (data.get("address") or "").strip()
+        user.save(update_fields = ["name", "email", "date_of_birth", "gender", "address"])
 
         student.parents_phone_number = data["parents_phone_number"].strip()
-        student.date_of_birth = data["date_of_birth"]
-        student.gender = data["gender"]
-        student.address = (data.get("address") or "").strip()
         student.department_id = data.get("department")
         student.section_id = data.get("section")
         student.is_active = data.get(

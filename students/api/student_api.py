@@ -4,6 +4,7 @@ from django.http import HttpResponse, JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from common.cache.cache_service import CacheService
 from common.messages import Messages
+from common.services.s3_service import S3Service
 from students.models import Student
 from students.cache.student_cache import StudentCache
 from students.repositories.student_repository import StudentRepository
@@ -14,8 +15,9 @@ student_validator = StudentValidator()
 student_repository = StudentRepository()
 student_cache = StudentCache(CacheService())
 student_service = StudentService(student_validator, student_repository, student_cache)
+s3_service = S3Service()
 
-from common.utils import paginate_queryset, resolve_ordering_param, resolve_pagination_params
+from common.utils import attach_profile_picture_urls, paginate_queryset, resolve_ordering_param, resolve_pagination_params
 from students.repositories.student_repository import DEFAULT_ORDERING, ORDERING_FIELDS
 
 def serialize_student(student):
@@ -25,13 +27,14 @@ def serialize_student(student):
         "last_name": student.effective_last_name,
         "student_email": student.effective_email,
         "parents_phone_number": student.parents_phone_number,
-        "date_of_birth": str(student.date_of_birth),
-        "gender": student.gender,
-        "address": student.address,
+        "date_of_birth": str(student.user.date_of_birth),
+        "gender": student.user.gender,
+        "address": student.user.address,
         "department": student.department_id,
         "section": student.section_id,
         "date_of_enrollment": str(student.date_of_enrollment),
         "is_active": student.is_active,
+        "profile_picture_url": student_service.get_profile_picture_view_url(student.id, s3_service),
     }
 
 
@@ -66,9 +69,12 @@ def student_api(request, student_id = None):
             #and DTO mapping all happen inside the service, behind the Redis list cache.
             page_number, page_size = resolve_pagination_params(request)
             ordering = resolve_ordering_param(request, ORDERING_FIELDS, DEFAULT_ORDERING)
-            return JsonResponse(
-                student_service.get_list(request.user, search, page_number, page_size, department_id, ordering)
-            )
+            payload = student_service.get_list(request.user, search, page_number, page_size, department_id, ordering)
+            #Signed URLs are generated here, AFTER the cache lookup, so the cached
+            #payload (a cache hit or a fresh loader() result) only ever carries the
+            #raw profile_picture_key - never a presigned URL.
+            payload["results"] = attach_profile_picture_urls(payload["results"], s3_service)
+            return JsonResponse(payload)
 
         if request.method == "POST":
             data = json.loads(request.body)
@@ -143,12 +149,13 @@ def serialize_student_profile(student):
         "last_name": student.effective_last_name,
         "student_email": student.effective_email,
         "parents_phone_number": student.parents_phone_number,
-        "date_of_birth": str(student.date_of_birth),
-        "gender": student.gender,
-        "address": student.address,
+        "date_of_birth": str(student.user.date_of_birth),
+        "gender": student.user.gender,
+        "address": student.user.address,
         "department_name": student.department.name if student.department_id else None,
         "section_name": student.section.name if student.section_id else None,
         "date_of_enrollment": str(student.date_of_enrollment),
+        "profile_picture_url": student_service.get_profile_picture_view_url(student.id, s3_service),
     }
 
 
@@ -206,3 +213,120 @@ def my_summary_api(request):
         "absent_count": absent_count,
         "recent_attendance": recent_attendance,
     })
+
+
+#── Profile picture (self-service, "me") ──────────────────────────────────────
+
+def _get_own_student(request):
+    from common.permissions import authenticate_request
+    user, error = authenticate_request(request)
+    if error:
+        return None, error
+
+    student = getattr(user, "student_profile", None)
+    if not student:
+        return None, JsonResponse({"error": Messages.STUDENT_NOT_FOUND}, status = 404)
+
+    return student, None
+
+
+@csrf_exempt
+def my_profile_picture_upload_url_api(request):
+    if request.method != "POST":
+        return JsonResponse({"error": Messages.METHOD_NOT_ALLOWED}, status = 405)
+
+    student, error = _get_own_student(request)
+    if error:
+        return error
+
+    try:
+        data = json.loads(request.body or "{}")
+        if not isinstance(data, dict):
+            raise ValueError(Messages.REQUEST_BODY_MUST_BE_JSON_OBJECT)
+
+        content_type = (data.get("content_type") or "").strip()
+        if not content_type:
+            raise ValueError(Messages.PROFILE_PICTURE_CONTENT_TYPE_REQUIRED)
+
+        result = student_service.generate_profile_picture_upload_url(student.id, content_type, s3_service)
+        return JsonResponse(result)
+
+    except json.JSONDecodeError:
+        return JsonResponse({"error": Messages.INVALID_JSON}, status = 400)
+
+    except ValueError as e:
+        return JsonResponse({"error": str(e)}, status = 400)
+
+
+@csrf_exempt
+def my_profile_picture_confirm_api(request):
+    if request.method != "POST":
+        return JsonResponse({"error": Messages.METHOD_NOT_ALLOWED}, status = 405)
+
+    student, error = _get_own_student(request)
+    if error:
+        return error
+
+    try:
+        data = json.loads(request.body or "{}")
+        if not isinstance(data, dict):
+            raise ValueError(Messages.REQUEST_BODY_MUST_BE_JSON_OBJECT)
+
+        key = (data.get("key") or "").strip()
+        if not key:
+            raise ValueError(Messages.PROFILE_PICTURE_KEY_REQUIRED)
+
+        student_service.confirm_profile_picture_upload(student.id, key, s3_service)
+        url = student_service.get_profile_picture_view_url(student.id, s3_service)
+        return JsonResponse({"profile_picture_url": url})
+
+    except json.JSONDecodeError:
+        return JsonResponse({"error": Messages.INVALID_JSON}, status = 400)
+
+    except ValueError as e:
+        return JsonResponse({"error": str(e)}, status = 400)
+
+
+@csrf_exempt
+def my_profile_picture_api(request):
+    student, error = _get_own_student(request)
+    if error:
+        return error
+
+    if request.method == "GET":
+        url = student_service.get_profile_picture_view_url(student.id, s3_service)
+        return JsonResponse({"profile_picture_url": url})
+
+    if request.method == "DELETE":
+        student_service.delete_profile_picture(student.id, s3_service)
+        return HttpResponse(status = 204)
+
+    return JsonResponse({"error": Messages.METHOD_NOT_ALLOWED}, status = 405)
+
+
+#── Profile picture (viewed by admin/teacher/self via id) ─────────────────────
+
+def student_profile_picture_api(request, student_id):
+    if request.method != "GET":
+        return JsonResponse({"error": Messages.METHOD_NOT_ALLOWED}, status = 405)
+
+    from common.permissions import apply_data_scope, authenticate_request
+    user, error = authenticate_request(request)
+    if error:
+        return error
+
+    #Reuses the exact same data-scope rule as the main student_api endpoint:
+    #admin sees everyone, a teacher only sees students enrolled in their own
+    #course offerings, a student only sees themself. Prevents a student from
+    #reading another student's picture by changing the ID in the URL, and a
+    #teacher from reading an arbitrary student's picture.
+    scoped_qs = apply_data_scope(user, student_repository.get_queryset_for_list(), 'student')
+    if not scoped_qs.filter(id = student_id).exists():
+        return JsonResponse({"error": Messages.FORBIDDEN}, status = 403)
+
+    try:
+        url = student_service.get_profile_picture_view_url(student_id, s3_service)
+        return JsonResponse({"profile_picture_url": url})
+
+    except Student.DoesNotExist:
+        return JsonResponse({"error": Messages.STUDENT_NOT_FOUND_BY_ID.format(student_id)}, status = 404)

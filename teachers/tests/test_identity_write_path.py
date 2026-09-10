@@ -21,10 +21,13 @@ class TeacherIdentityWritePathTests(TestCase):
         self.user = User.objects.create_user(
             email = "teacher@example.com", name = "Original Name", password = "x", role = "teacher",
         )
+        self.user.date_of_birth = date(1980, 1, 1)
+        self.user.gender = "M"
+        self.user.save(update_fields = ["date_of_birth", "gender"])
         self.teacher = Teacher.objects.create(
             user = self.user, employee_id = "E1", phone_number = "1234567",
             department = self.department, designation = "Lecturer", qualification = "MSc",
-            gender = "M", date_of_birth = date(1980, 1, 1), date_of_joining = date(2020, 1, 1), salary = 1,
+            date_of_joining = date(2020, 1, 1), salary = 1,
         )
 
     def _base_data(self, **overrides):
@@ -93,7 +96,7 @@ class TeacherIdentityWritePathTests(TestCase):
             ),
             employee_id = "E9", phone_number = "1234567",
             department = self.department, designation = "Lecturer", qualification = "MSc",
-            gender = "M", date_of_birth = date(1980, 1, 1), date_of_joining = date(2020, 1, 1), salary = 1,
+            date_of_joining = date(2020, 1, 1), salary = 1,
         )
         data = self._base_data(employee_id = "E9", email = "teacher@example.com")
         with self.assertRaises(ValueError):

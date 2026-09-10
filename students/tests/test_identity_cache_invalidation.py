@@ -33,7 +33,6 @@ class StudentIdentityCacheInvalidationTests(TestCase):
         )
         self.student = Student.objects.create(
             user = self.user, parents_phone_number = "1234567",
-            date_of_birth = date(2000, 1, 1), gender = "M",
             department = self.department, section = self.section,
         )
 
@@ -43,9 +42,9 @@ class StudentIdentityCacheInvalidationTests(TestCase):
             "last_name": student.effective_last_name,
             "student_email": student.effective_email,
             "parents_phone_number": student.parents_phone_number,
-            "date_of_birth": student.date_of_birth,
-            "gender": student.gender,
-            "address": student.address,
+            "date_of_birth": date(2000, 1, 1),
+            "gender": "M",
+            "address": student.user.address,
             "department": student.department_id,
             "section": student.section_id,
             "is_active": student.is_active,
@@ -85,7 +84,7 @@ class StudentIdentityCacheInvalidationTests(TestCase):
             ),
             employee_id = "CACHE1", phone_number = "1234567",
             department = self.department, designation = "Lecturer", qualification = "MSc",
-            gender = "M", date_of_birth = date(1980, 1, 1), date_of_joining = date(2020, 1, 1), salary = 1,
+            date_of_joining = date(2020, 1, 1), salary = 1,
         )
         teacher_cache = TeacherCache(CacheService())
         # Warm the Teacher detail cache directly (bypassing the DB) so we can

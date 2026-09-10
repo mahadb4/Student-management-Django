@@ -1,6 +1,7 @@
 import json
 from django.core.paginator import EmptyPage, PageNotAnInteger, Paginator
 from django.http import JsonResponse
+from common.constants import PROFILE_PICTURE_CONTENT_TYPES
 from common.messages import Messages
 
 
@@ -137,6 +138,32 @@ def build_paginated_payload(queryset,
         "total_pages": paginator.num_pages,
         "results": [serializer_func(item) for item in page_obj],
     }
+
+
+#Validates a client-supplied Content-Type against the profile-picture allowlist
+#and returns the file extension to use in the S3 key. Never trusts the client
+#for anything beyond picking the extension - the object itself is re-checked
+#server-side (size/type) at confirm time via S3Service.head_object().
+def extension_for_content_type(content_type):
+    normalized = (content_type or "").strip().lower()
+
+    if normalized not in PROFILE_PICTURE_CONTENT_TYPES:
+        raise ValueError(Messages.PROFILE_PICTURE_INVALID_CONTENT_TYPE.format(content_type))
+
+    return PROFILE_PICTURE_CONTENT_TYPES[normalized]
+
+
+#Turns each list-payload item's cached `profile_picture_key` into a FRESH
+#presigned `profile_picture_url`, generated after the item leaves the Redis
+#list cache (build_paginated_payload's output is what gets cached) so a signed
+#URL is never itself written to Redis. Presigning is local HMAC computation,
+#not an S3 API call, so this adds no network round trips / no N+1 queries.
+def attach_profile_picture_urls(results, s3_service):
+    for item in results:
+        key = item.pop("profile_picture_key", None)
+        item["profile_picture_url"] = s3_service.generate_view_url(key) if key else None
+
+    return results
 
 
 def paginate_queryset(request, #Contains: ?page=2&page_size=10

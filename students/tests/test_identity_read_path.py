@@ -1,4 +1,3 @@
-from datetime import date
 from django.test import TestCase
 from departments.models import Department
 from sections.models import Section
@@ -22,7 +21,6 @@ class StudentIdentityReadPathTests(TestCase):
         )
         self.student = Student.objects.create(
             user = self.user, parents_phone_number = "1234567",
-            date_of_birth = date(2000, 1, 1), gender = "M",
             department = self.department, section = self.section,
         )
 
@@ -40,7 +38,7 @@ class StudentIdentityReadPathTests(TestCase):
         self.assertEqual(dto["student_email"], "student@example.com")
         self.assertEqual(
             set(dto.keys()),
-            {"id", "name", "student_email", "department_name", "section_name"},
+            {"id", "name", "student_email", "department_name", "section_name", "profile_picture_key"},
         )
 
     def test_student_name_sorting_uses_user_name(self):
@@ -49,7 +47,6 @@ class StudentIdentityReadPathTests(TestCase):
         )
         other_student = Student.objects.create(
             user = other_user, parents_phone_number = "1234567",
-            date_of_birth = date(2000, 1, 1), gender = "F",
             department = self.department, section = self.section,
         )
         repo = StudentRepository()

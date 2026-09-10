@@ -11,13 +11,6 @@ class Student(models.Model):
         related_name = "student_profile")
 
     parents_phone_number = models.CharField(max_length = 20)
-    date_of_birth = models.DateField()
-
-    gender = models.CharField(
-        max_length = 1,
-        choices = [("M","Male"),("F","Female")])
-    
-    address = models.TextField(blank = True,null = True)
 
     department = models.ForeignKey(
         Department,on_delete = models.PROTECT,
@@ -28,6 +21,7 @@ class Student(models.Model):
         related_name = "students",null = True,blank = True)
     
     date_of_enrollment = models.DateField(auto_now_add = True)
+
     is_active = models.BooleanField(default = True)
     is_deleted = models.BooleanField(default = False)
     created_at = models.DateTimeField(auto_now_add = True)

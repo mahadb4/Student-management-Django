@@ -220,6 +220,9 @@ class Command(BaseCommand):
                             role = "teacher",
                             status = "approved",
                         )
+                        user.gender = "M"
+                        user.date_of_birth = datetime.date(1985, 1, 1)
+                        user.save(update_fields = ["gender", "date_of_birth"])
                         group, _ = Group.objects.get_or_create(name = "TEACHER")
                         user.groups.add(group)
 
@@ -230,8 +233,6 @@ class Command(BaseCommand):
                         department = home_dept,
                         designation = "Lecturer",
                         qualification = "MS",
-                        gender = "M",
-                        date_of_birth = datetime.date(1985, 1, 1),
                         salary = 100000,
                         is_active = True,
                     )

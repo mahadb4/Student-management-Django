@@ -33,7 +33,6 @@ class TransitiveIdentityReadPathTests(TestCase):
         )
         self.student = Student.objects.create(
             user = self.student_user, parents_phone_number = "1234567",
-            date_of_birth = date(2000, 1, 1), gender = "M",
             department = self.department, section = self.section,
         )
 
@@ -44,7 +43,7 @@ class TransitiveIdentityReadPathTests(TestCase):
             user = self.teacher_user,
             employee_id = "E1", phone_number = "1234567",
             department = self.department, designation = "Lecturer", qualification = "MSc",
-            gender = "M", date_of_birth = date(1980, 1, 1), date_of_joining = date(2020, 1, 1), salary = 1,
+            date_of_joining = date(2020, 1, 1), salary = 1,
         )
 
         self.course = Course.objects.create(

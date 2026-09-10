@@ -19,7 +19,7 @@ class TeacherIdentityReadPathTests(TestCase):
         self.teacher = Teacher.objects.create(
             user = self.user, employee_id = "E1", phone_number = "1234567",
             department = self.department, designation = "Lecturer", qualification = "MSc",
-            gender = "M", date_of_birth = date(1980, 1, 1), date_of_joining = date(2020, 1, 1), salary = 1,
+            date_of_joining = date(2020, 1, 1), salary = 1,
         )
 
     def test_teacher_reads_identity_from_user(self):
@@ -36,7 +36,7 @@ class TeacherIdentityReadPathTests(TestCase):
         self.assertEqual(dto["email"], "teacher@example.com")
         self.assertEqual(
             set(dto.keys()),
-            {"id", "employee_id", "name", "email", "designation", "department_name"},
+            {"id", "employee_id", "name", "email", "designation", "department_name", "profile_picture_key"},
         )
 
     def test_teacher_name_sorting_uses_user_name(self):
@@ -46,7 +46,7 @@ class TeacherIdentityReadPathTests(TestCase):
         other_teacher = Teacher.objects.create(
             user = other_user, employee_id = "E2", phone_number = "1234567",
             department = self.department, designation = "Lecturer", qualification = "MSc",
-            gender = "F", date_of_birth = date(1980, 1, 1), date_of_joining = date(2020, 1, 1), salary = 1,
+            date_of_joining = date(2020, 1, 1), salary = 1,
         )
         repo = TeacherRepository()
         ids_in_order = list(
