@@ -1,8 +1,9 @@
 from django.contrib.auth.models import Group
 from django.db import transaction
+from common.constants import MAX_PROFILE_PICTURE_SIZE_BYTES, PROFILE_PICTURE_URL_EXPIRY_SECONDS
 from common.messages import Messages
 from common.permissions import apply_data_scope
-from common.utils import apply_ordering, build_full_name, build_paginated_payload
+from common.utils import apply_ordering, build_full_name, build_paginated_payload, extension_for_content_type
 from teachers.mappers.teacher_mapper import TeacherMapper
 from teachers.repositories.teacher_repository import ORDERING_FIELDS
 from users.models import User
@@ -99,6 +100,66 @@ class TeacherService:
         self.cache.invalidate_on_write(teacher_id)
         return result
 
+    #Backend derives the key itself (teachers/<id>/profile.<ext>) - the caller
+    #only picks the content type. s3_service is passed in rather than stored on
+    #the instance so existing TeacherService(validator, repository, cache)
+    #call sites/tests are unaffected.
+    def generate_profile_picture_upload_url(self,teacher_id,content_type,s3_service):
+        self.repository.get(teacher_id)  #raises Teacher.DoesNotExist if invalid
+
+        extension = extension_for_content_type(content_type)
+        key = f"teachers/{teacher_id}/profile.{extension}"
+        upload_url = s3_service.generate_upload_url(key,content_type,expires_in = PROFILE_PICTURE_URL_EXPIRY_SECONDS)
+
+        return {"upload_url":upload_url,"key":key,"content_type":content_type}
+
+    #Never trusts the frontend saying "upload succeeded" - verifies the object
+    #actually exists (and is within size limits) via head_object() before ever
+    #touching the database. The old object is only deleted AFTER the DB write
+    #for the new one succeeds.
+    def confirm_profile_picture_upload(self,teacher_id,key,s3_service):
+        teacher = self.repository.get(teacher_id)
+
+        expected_prefix = f"teachers/{teacher_id}/profile."
+        if not key or not key.startswith(expected_prefix):
+            raise ValueError(Messages.PROFILE_PICTURE_KEY_MISMATCH)
+
+        metadata = s3_service.head_object(key)
+        if metadata is None:
+            raise ValueError(Messages.PROFILE_PICTURE_UPLOAD_NOT_FOUND)
+
+        content_length = metadata.get("content_length") or 0
+        if content_length > MAX_PROFILE_PICTURE_SIZE_BYTES:
+            s3_service.delete_object(key)
+            raise ValueError(Messages.PROFILE_PICTURE_TOO_LARGE.format(MAX_PROFILE_PICTURE_SIZE_BYTES // (1024 * 1024)))
+
+        old_key = teacher.user.profile_picture_key
+        self.repository.update_profile_picture_key(teacher,key)
+        self.cache.invalidate_on_write(teacher_id)
+
+        if old_key and old_key != key:
+            s3_service.delete_object(old_key)
+
+        return teacher
+
+    #Fresh presigned URL every call - never stored in the DB, never stored in
+    #Redis (the cached detail entry only ever holds the Teacher model/key).
+    def get_profile_picture_view_url(self,teacher_id,s3_service):
+        teacher = self.get(teacher_id)
+        if not teacher.user.profile_picture_key:
+            return None
+
+        return s3_service.generate_view_url(teacher.user.profile_picture_key,expires_in = PROFILE_PICTURE_URL_EXPIRY_SECONDS)
+
+    def delete_profile_picture(self,teacher_id,s3_service):
+        teacher = self.repository.get(teacher_id)
+        if not teacher.user.profile_picture_key:
+            return
+
+        s3_service.delete_object(teacher.user.profile_picture_key)
+        self.repository.update_profile_picture_key(teacher,None)
+        self.cache.invalidate_on_write(teacher_id)
+
     def _merge_data(self,teacher,data):
         return {
             "first_name":data.get("first_name",teacher.effective_first_name),
@@ -109,10 +170,10 @@ class TeacherService:
             "department":data.get("department",teacher.department_id),
             "designation":data.get("designation",teacher.designation),
             "qualification":data.get("qualification",teacher.qualification),
-            "gender":data.get("gender",teacher.gender),
-            "date_of_birth":data.get("date_of_birth",teacher.date_of_birth),
+            "gender":data.get("gender",teacher.user.gender),
+            "date_of_birth":data.get("date_of_birth",teacher.user.date_of_birth),
             "date_of_joining":data.get("date_of_joining",teacher.date_of_joining),
             "salary":data.get("salary",teacher.salary),
-            "address":data.get("address",teacher.address),
+            "address":data.get("address",teacher.user.address),
             "is_active":data.get("is_active",teacher.is_active),
         }

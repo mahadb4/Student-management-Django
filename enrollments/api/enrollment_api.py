@@ -4,6 +4,7 @@ from django.http import HttpResponse, JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from common.cache.cache_service import CacheService
 from common.messages import Messages
+from common.services.s3_service import S3Service
 from enrollments.cache.enrollment_cache import EnrollmentCache
 from enrollments.models import Enrollment
 from enrollments.repositories.enrollment_repository import DEFAULT_ORDERING, ORDERING_FIELDS, EnrollmentRepository
@@ -14,8 +15,9 @@ enrollment_validator = EnrollmentValidator()
 enrollment_repository = EnrollmentRepository()
 enrollment_cache = EnrollmentCache(CacheService())
 enrollment_service = EnrollmentService(enrollment_validator, enrollment_repository, enrollment_cache)
+s3_service = S3Service()
 
-from common.utils import paginate_queryset, resolve_ordering_param, resolve_pagination_params
+from common.utils import attach_profile_picture_urls, build_paginated_payload, paginate_queryset, resolve_ordering_param, resolve_pagination_params
 
 
 def serialize_enrollment(enrollment):
@@ -128,7 +130,12 @@ def my_enrollments_api(request):
 
     if request.method == "GET":
         qs = enrollment_repository.get_queryset_for_list().filter(student_id = student.id, is_deleted = False)
-        return paginate_queryset(request, qs, EnrollmentMapper.to_student_list_dto, default_page_size = 10)
+        page_number, page_size = resolve_pagination_params(request, default_page_size = 10)
+        payload = build_paginated_payload(qs, page_number, page_size, EnrollmentMapper.to_student_list_dto)
+        #Signed teacher-picture URLs are generated here, from the raw
+        #profile_picture_key the DTO carries - never cached, never persisted.
+        payload["results"] = attach_profile_picture_urls(payload["results"], s3_service)
+        return JsonResponse(payload)
 
     # POST: student self-enrollment - the student identity comes from the
     # authenticated request (student.id above), never from the request body,
@@ -148,7 +155,8 @@ def my_enrollments_api(request):
             "status": data.get("status", Enrollment.Status.ACTIVE),
         })
 
-        return JsonResponse(EnrollmentMapper.to_student_list_dto(enrollment), status = 201)
+        result = attach_profile_picture_urls([EnrollmentMapper.to_student_list_dto(enrollment)], s3_service)[0]
+        return JsonResponse(result, status = 201)
 
     except json.JSONDecodeError:
         return JsonResponse({"error": Messages.INVALID_JSON}, status = 400)

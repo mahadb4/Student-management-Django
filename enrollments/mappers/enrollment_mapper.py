@@ -51,6 +51,11 @@ class EnrollmentMapper:
             course_code = enrollment.course_offering.course.code,
             teacher_name = teacher_name,
             section_name = section_name,
+            teacher_id = enrollment.course_offering.teacher_id,
+            profile_picture_key = (
+                enrollment.course_offering.teacher.user.profile_picture_key
+                if enrollment.course_offering.teacher_id else None
+            ),
         ).to_dict()
 
     # Used only by the Student Attendance course filter dropdown - the
@@ -79,10 +84,12 @@ class EnrollmentMapper:
 
         return EnrollmentTeacherListDTO(
             enrollment_id = enrollment.id,
+            student_id = enrollment.student_id,
             student_name = f"{enrollment.student.effective_first_name} {enrollment.student.effective_last_name}",
             student_email = enrollment.student.effective_email,
             course_name = enrollment.course_offering.course.name,
             course_code = enrollment.course_offering.course.code,
             section_name = section_name,
             status = enrollment.status,
+            profile_picture_key = enrollment.student.user.profile_picture_key,
         ).to_dict()

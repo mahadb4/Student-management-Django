@@ -9,6 +9,8 @@ class StudentEnrollmentListDTO:
         course_code,
         teacher_name,
         section_name,
+        teacher_id = None,
+        profile_picture_key = None,
     ):
         self.id = id
         self.status = status
@@ -18,6 +20,8 @@ class StudentEnrollmentListDTO:
         self.course_code = course_code
         self.teacher_name = teacher_name
         self.section_name = section_name
+        self.teacher_id = teacher_id
+        self.profile_picture_key = profile_picture_key
 
     def to_dict(self):
         return {
@@ -29,4 +33,8 @@ class StudentEnrollmentListDTO:
             "course_code": self.course_code,
             "teacher_name": self.teacher_name,
             "section_name": self.section_name,
+            "teacher_id": self.teacher_id,
+            #Raw S3 key only - the API layer converts this into a fresh
+            #presigned profile_picture_url after this dict leaves paginate_queryset.
+            "profile_picture_key": self.profile_picture_key,
         }

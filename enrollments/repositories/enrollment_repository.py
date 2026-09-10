@@ -23,12 +23,13 @@ class EnrollmentRepository(BaseRepository):
         ).only(
             "id", "status",
             "student__id", "student__user_id", "student__user__name", "student__user__email",
+            "student__user__profile_picture_key",
             "course_offering__id", "course_offering__semester", "course_offering__academic_year",
             "course_offering__course__id", "course_offering__course__name", "course_offering__course__code",
             "course_offering__section__id", "course_offering__section__name",
             "course_offering__teacher__id",
             "course_offering__teacher__user_id", "course_offering__teacher__user__name",
-            "course_offering__teacher__user__email",
+            "course_offering__teacher__user__email", "course_offering__teacher__user__profile_picture_key",
         )
 
         if search:

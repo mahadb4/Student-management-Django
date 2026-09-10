@@ -168,3 +168,16 @@ class Messages:
     ATTENDANCE_COURSE_OFFERING_NOT_FOUND = "Course offering not found."
     ATTENDANCE_COURSE_OFFERING_NOT_ASSIGNED = "You are not assigned to this course offering."
     ATTENDANCE_ENROLLMENT_NOT_FOUND = "Enrollment not found or is not active."
+
+    # ── Profile Picture ───────────────────────────────────────────────────────
+    PROFILE_PICTURE_CONTENT_TYPE_REQUIRED = "content_type is required."
+    PROFILE_PICTURE_INVALID_CONTENT_TYPE = (
+        "Unsupported image type '{}'. Allowed types: JPEG, PNG, WebP."
+    )
+    PROFILE_PICTURE_KEY_REQUIRED = "key is required."
+    PROFILE_PICTURE_KEY_MISMATCH = "The provided key does not belong to this profile."
+    PROFILE_PICTURE_UPLOAD_NOT_FOUND = (
+        "No uploaded object was found for this key. Upload the file to S3 before confirming."
+    )
+    PROFILE_PICTURE_TOO_LARGE = "Profile picture exceeds the maximum allowed size of {} MB."
+    PROFILE_PICTURE_NOT_FOUND = "No profile picture is set."

@@ -4,6 +4,7 @@ from django.http import HttpResponse, JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from common.cache.cache_service import CacheService
 from common.messages import Messages
+from common.services.s3_service import S3Service
 from teachers.cache.teacher_cache import TeacherCache
 from teachers.models import Teacher
 from teachers.repositories.teacher_repository import DEFAULT_ORDERING, ORDERING_FIELDS, TeacherRepository
@@ -14,8 +15,9 @@ teacher_validator = TeacherValidator()
 teacher_repository = TeacherRepository()
 teacher_cache = TeacherCache(CacheService())
 teacher_service = TeacherService(teacher_validator, teacher_repository, teacher_cache)
+s3_service = S3Service()
 
-from common.utils import paginate_queryset, resolve_ordering_param, resolve_pagination_params
+from common.utils import attach_profile_picture_urls, build_paginated_payload, paginate_queryset, resolve_ordering_param, resolve_pagination_params
 
 def serialize_teacher_profile(teacher):
     return {
@@ -26,6 +28,7 @@ def serialize_teacher_profile(teacher):
         "email": teacher.effective_email,
         "department_name": teacher.department.name if teacher.department_id else None,
         "designation": teacher.designation,
+        "profile_picture_url": teacher_service.get_profile_picture_view_url(teacher.id, s3_service),
     }
 
 
@@ -40,14 +43,15 @@ def serialize_teacher(teacher):
         "department": teacher.department_id,
         "designation": teacher.designation,
         "qualification": teacher.qualification,
-        "gender": teacher.gender,
-        "date_of_birth": teacher.date_of_birth,
+        "gender": teacher.user.gender,
+        "date_of_birth": teacher.user.date_of_birth,
         "date_of_joining": teacher.date_of_joining,
         "salary": teacher.salary,
-        "address": teacher.address,
+        "address": teacher.user.address,
         "is_active": teacher.is_active,
         "created_at": teacher.created_at,
         "updated_at": teacher.updated_at,
+        "profile_picture_url": teacher_service.get_profile_picture_view_url(teacher.id, s3_service),
     }
 
 
@@ -81,9 +85,12 @@ def teacher_api(request, teacher_id = None):
             #and DTO mapping all happen inside the service, behind the Redis list cache.
             page_number, page_size = resolve_pagination_params(request)
             ordering = resolve_ordering_param(request, ORDERING_FIELDS, DEFAULT_ORDERING)
-            return JsonResponse(
-                teacher_service.get_list(request.user, search, page_number, page_size, department_id, ordering)
-            )
+            payload = teacher_service.get_list(request.user, search, page_number, page_size, department_id, ordering)
+            #Signed URLs are generated here, AFTER the cache lookup, so the cached
+            #payload (a cache hit or a fresh loader() result) only ever carries the
+            #raw profile_picture_key - never a presigned URL.
+            payload["results"] = attach_profile_picture_urls(payload["results"], s3_service)
+            return JsonResponse(payload)
 
         if request.method == "POST":
             teacher = teacher_service.create(json.loads(request.body))
@@ -181,7 +188,12 @@ def my_students_api(request):
     if course_offering_id:
         qs = qs.filter(course_offering_id = course_offering_id)
 
-    return paginate_queryset(request, qs, EnrollmentMapper.to_teacher_list_dto, default_page_size = 10)
+    page_number, page_size = resolve_pagination_params(request, default_page_size = 10)
+    payload = build_paginated_payload(qs, page_number, page_size, EnrollmentMapper.to_teacher_list_dto)
+    #Signed student-picture URLs are generated here, from the raw
+    #profile_picture_key the DTO carries - never cached, never persisted.
+    payload["results"] = attach_profile_picture_urls(payload["results"], s3_service)
+    return JsonResponse(payload)
 
 
 def my_dashboard_api(request):
@@ -215,3 +227,120 @@ def my_dashboard_api(request):
         "active_classes": active_classes,
         "total_students": total_students,
     })
+
+
+#── Profile picture (self-service, "me") ──────────────────────────────────────
+
+def _get_own_teacher(request):
+    from common.permissions import authenticate_request
+    user, error = authenticate_request(request)
+    if error:
+        return None, error
+
+    teacher = getattr(user, "teacher_profile", None)
+    if not teacher:
+        return None, JsonResponse({"error": Messages.TEACHER_NOT_FOUND}, status = 404)
+
+    return teacher, None
+
+
+@csrf_exempt
+def my_profile_picture_upload_url_api(request):
+    if request.method != "POST":
+        return JsonResponse({"error": Messages.METHOD_NOT_ALLOWED}, status = 405)
+
+    teacher, error = _get_own_teacher(request)
+    if error:
+        return error
+
+    try:
+        data = json.loads(request.body or "{}")
+        if not isinstance(data, dict):
+            raise ValueError(Messages.REQUEST_BODY_MUST_BE_JSON_OBJECT)
+
+        content_type = (data.get("content_type") or "").strip()
+        if not content_type:
+            raise ValueError(Messages.PROFILE_PICTURE_CONTENT_TYPE_REQUIRED)
+
+        result = teacher_service.generate_profile_picture_upload_url(teacher.id, content_type, s3_service)
+        return JsonResponse(result)
+
+    except json.JSONDecodeError:
+        return JsonResponse({"error": Messages.INVALID_JSON}, status = 400)
+
+    except ValueError as e:
+        return JsonResponse({"error": str(e)}, status = 400)
+
+
+@csrf_exempt
+def my_profile_picture_confirm_api(request):
+    if request.method != "POST":
+        return JsonResponse({"error": Messages.METHOD_NOT_ALLOWED}, status = 405)
+
+    teacher, error = _get_own_teacher(request)
+    if error:
+        return error
+
+    try:
+        data = json.loads(request.body or "{}")
+        if not isinstance(data, dict):
+            raise ValueError(Messages.REQUEST_BODY_MUST_BE_JSON_OBJECT)
+
+        key = (data.get("key") or "").strip()
+        if not key:
+            raise ValueError(Messages.PROFILE_PICTURE_KEY_REQUIRED)
+
+        teacher_service.confirm_profile_picture_upload(teacher.id, key, s3_service)
+        url = teacher_service.get_profile_picture_view_url(teacher.id, s3_service)
+        return JsonResponse({"profile_picture_url": url})
+
+    except json.JSONDecodeError:
+        return JsonResponse({"error": Messages.INVALID_JSON}, status = 400)
+
+    except ValueError as e:
+        return JsonResponse({"error": str(e)}, status = 400)
+
+
+@csrf_exempt
+def my_profile_picture_api(request):
+    teacher, error = _get_own_teacher(request)
+    if error:
+        return error
+
+    if request.method == "GET":
+        url = teacher_service.get_profile_picture_view_url(teacher.id, s3_service)
+        return JsonResponse({"profile_picture_url": url})
+
+    if request.method == "DELETE":
+        teacher_service.delete_profile_picture(teacher.id, s3_service)
+        return HttpResponse(status = 204)
+
+    return JsonResponse({"error": Messages.METHOD_NOT_ALLOWED}, status = 405)
+
+
+#── Profile picture (viewed by admin/student/self via id) ─────────────────────
+
+def teacher_profile_picture_api(request, teacher_id):
+    if request.method != "GET":
+        return JsonResponse({"error": Messages.METHOD_NOT_ALLOWED}, status = 405)
+
+    from common.permissions import apply_data_scope, authenticate_request
+    user, error = authenticate_request(request)
+    if error:
+        return error
+
+    #Reuses the exact same data-scope rule as the main teacher_api endpoint:
+    #admin sees everyone, a teacher only sees themself, a student only sees
+    #teachers of their own enrolled courses. Prevents a teacher from reading
+    #an arbitrary teacher's picture, and a student from reading an
+    #unauthorized teacher's picture by changing the ID in the URL.
+    scoped_qs = apply_data_scope(user, Teacher.objects.all(), 'teacher')
+    if not scoped_qs.filter(id = teacher_id).exists():
+        return JsonResponse({"error": Messages.FORBIDDEN}, status = 403)
+
+    try:
+        url = teacher_service.get_profile_picture_view_url(teacher_id, s3_service)
+        return JsonResponse({"profile_picture_url": url})
+
+    except Teacher.DoesNotExist:
+        return JsonResponse({"error": Messages.TEACHER_NOT_FOUND_BY_ID.format(teacher_id)}, status = 404)

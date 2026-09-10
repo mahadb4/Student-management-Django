@@ -1,8 +1,14 @@
 from pathlib import Path
+from pathlib import Path
+from decouple import config
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-SECRET_KEY = 'django-insecure-+e8c%5(kyd0&=!b%nscq5@m^rhg!+q6t(m#cxl)+!in!puf#=!'
+SECRET_KEY = config("SECRET_KEY")
+AWS_ACCESS_KEY_ID = config("AWS_ACCESS_KEY_ID")
+AWS_SECRET_ACCESS_KEY = config("AWS_SECRET_ACCESS_KEY")
+AWS_STORAGE_BUCKET_NAME = config("AWS_STORAGE_BUCKET_NAME")
+AWS_S3_REGION_NAME = config("AWS_S3_REGION_NAME")
 
 DEBUG = True
 

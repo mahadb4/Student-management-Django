@@ -56,6 +56,20 @@ class User(AbstractBaseUser, PermissionsMixin):
     status = models.CharField(max_length = 20, choices = STATUS_CHOICES, default = "pending")
     is_active = models.BooleanField(default = True)
     is_staff = models.BooleanField(default = False)
+
+    date_of_birth = models.DateField(null = True, blank = True)
+
+    gender = models.CharField(
+        max_length = 1,
+        choices = [("M","Male"),("F","Female")],
+        null = True, blank = True)
+
+    address = models.TextField(blank = True, null = True)
+
+    # S3 object key only (e.g. "students/3/profile.jpg") - never a URL, never
+    # image bytes. Signed view URLs are generated on demand, not stored.
+    profile_picture_key = models.CharField(max_length = 255, null = True, blank = True)
+
     created_at = models.DateTimeField(auto_now_add = True)
     updated_at = models.DateTimeField(auto_now = True)
 

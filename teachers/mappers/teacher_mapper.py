@@ -12,6 +12,7 @@ class TeacherMapper:
             email = teacher.effective_email,
             designation = teacher.designation,
             department_name = teacher.department.name if teacher.department_id else None,
+            profile_picture_key = teacher.user.profile_picture_key,
         ).to_dict()
 
     @staticmethod
