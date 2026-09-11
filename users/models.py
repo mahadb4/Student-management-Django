@@ -66,8 +66,6 @@ class User(AbstractBaseUser, PermissionsMixin):
 
     address = models.TextField(blank = True, null = True)
 
-    # S3 object key only (e.g. "students/3/profile.jpg") - never a URL, never
-    # image bytes. Signed view URLs are generated on demand, not stored.
     profile_picture_key = models.CharField(max_length = 255, null = True, blank = True)
 
     created_at = models.DateTimeField(auto_now_add = True)

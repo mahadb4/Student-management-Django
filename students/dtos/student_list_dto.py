@@ -14,8 +14,5 @@ class StudentListDTO:
             "student_email": self.student_email,
             "department_name": self.department_name,
             "section_name": self.section_name,
-            #Raw S3 key only - never a URL. The API layer converts this into a
-            #fresh presigned profile_picture_url AFTER this dict leaves the list
-            #cache, so a signed URL is never itself written to Redis.
             "profile_picture_key": self.profile_picture_key,
         }

@@ -14,3 +14,15 @@ PROFILE_PICTURE_CONTENT_TYPES = {
 }
 MAX_PROFILE_PICTURE_SIZE_BYTES = 5 * 1024 * 1024  # 5 MB
 PROFILE_PICTURE_URL_EXPIRY_SECONDS = 300  # 5 minutes, for both upload and view URLs
+
+# ── Assignment attachments / submissions (S3) ───────────────────────────────
+# Same key-by-Content-Type approach as PROFILE_PICTURE_CONTENT_TYPES.
+ASSIGNMENT_FILE_CONTENT_TYPES = {
+    "application/pdf": "pdf",
+    "application/msword": "doc",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document": "docx",
+    "application/zip": "zip",
+    "application/x-zip-compressed": "zip",
+}
+MAX_ASSIGNMENT_FILE_SIZE_BYTES = 20 * 1024 * 1024  # 20 MB
+ASSIGNMENT_FILE_URL_EXPIRY_SECONDS = 300  # 5 minutes, for both upload and view URLs

@@ -70,8 +70,6 @@ class StudentRepository(BaseRepository):
             student.save()
         return student
 
-    #The only writer of profile_picture_key. Bypasses fill()/validator since this
-    #is never part of the regular student create/update payload. Lives on User.
     def update_profile_picture_key(self, student, key):
         user = student.user
         user.profile_picture_key = key

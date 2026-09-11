@@ -20,10 +20,13 @@ s3_service = S3Service()
 from common.utils import attach_profile_picture_urls, build_paginated_payload, paginate_queryset, resolve_ordering_param, resolve_pagination_params
 
 def serialize_teacher_profile(teacher):
+    # The Profile page renders the name as one string ("Muhammad Owais"), never
+    # first/last separately, so this profile-only DTO returns it pre-joined -
+    # unlike serialize_teacher() below (Admin's CRUD), which keeps them split
+    # since Admin's edit form needs them as separate inputs.
     return {
         "id": teacher.id,
-        "first_name": teacher.effective_first_name,
-        "last_name": teacher.effective_last_name,
+        "name": f"{teacher.effective_first_name} {teacher.effective_last_name}",
         "employee_id": teacher.employee_id,
         "email": teacher.effective_email,
         "department_name": teacher.department.name if teacher.department_id else None,
@@ -86,9 +89,6 @@ def teacher_api(request, teacher_id = None):
             page_number, page_size = resolve_pagination_params(request)
             ordering = resolve_ordering_param(request, ORDERING_FIELDS, DEFAULT_ORDERING)
             payload = teacher_service.get_list(request.user, search, page_number, page_size, department_id, ordering)
-            #Signed URLs are generated here, AFTER the cache lookup, so the cached
-            #payload (a cache hit or a fresh loader() result) only ever carries the
-            #raw profile_picture_key - never a presigned URL.
             payload["results"] = attach_profile_picture_urls(payload["results"], s3_service)
             return JsonResponse(payload)
 
@@ -161,14 +161,16 @@ def my_profile_api(request):
 
 
 def my_students_api(request):
-    # Returns one row per enrollment (student + which of the teacher's own
-    # classes/section they're in), which is what the Teacher Students page
-    # actually renders - not bare Student records with no class context.
+    # Returns one row per enrollment (student only - no course/section fields,
+    # since the frontend always calls this with a single ?course_offering_id=
+    # already, making those fields identical/redundant on every row - see
+    # EnrollmentMapper.to_teacher_list_dto).
     if request.method != "GET":
         return JsonResponse({"error": Messages.METHOD_NOT_ALLOWED}, status = 405)
 
     from common.permissions import authenticate_request, apply_data_scope
-    from enrollments.repositories.enrollment_repository import EnrollmentRepository
+    from common.utils import apply_ordering
+    from enrollments.repositories.enrollment_repository import DEFAULT_ORDERING, ORDERING_FIELDS, EnrollmentRepository
     from enrollments.mappers.enrollment_mapper import EnrollmentMapper
 
     user, error = authenticate_request(request)
@@ -188,10 +190,13 @@ def my_students_api(request):
     if course_offering_id:
         qs = qs.filter(course_offering_id = course_offering_id)
 
+    # Same alphabetical-by-name ordering Admin's Enrollments list already
+    # applies (ORDERING_FIELDS/DEFAULT_ORDERING = "name", i.e.
+    # student__user__name) - reused here rather than left unsorted.
+    qs = apply_ordering(qs, DEFAULT_ORDERING, ORDERING_FIELDS)
+
     page_number, page_size = resolve_pagination_params(request, default_page_size = 10)
     payload = build_paginated_payload(qs, page_number, page_size, EnrollmentMapper.to_teacher_list_dto)
-    #Signed student-picture URLs are generated here, from the raw
-    #profile_picture_key the DTO carries - never cached, never persisted.
     payload["results"] = attach_profile_picture_urls(payload["results"], s3_service)
     return JsonResponse(payload)
 
@@ -228,8 +233,6 @@ def my_dashboard_api(request):
         "total_students": total_students,
     })
 
-
-#── Profile picture (self-service, "me") ──────────────────────────────────────
 
 def _get_own_teacher(request):
     from common.permissions import authenticate_request
@@ -318,8 +321,6 @@ def my_profile_picture_api(request):
     return JsonResponse({"error": Messages.METHOD_NOT_ALLOWED}, status = 405)
 
 
-#── Profile picture (viewed by admin/student/self via id) ─────────────────────
-
 def teacher_profile_picture_api(request, teacher_id):
     if request.method != "GET":
         return JsonResponse({"error": Messages.METHOD_NOT_ALLOWED}, status = 405)
@@ -329,11 +330,6 @@ def teacher_profile_picture_api(request, teacher_id):
     if error:
         return error
 
-    #Reuses the exact same data-scope rule as the main teacher_api endpoint:
-    #admin sees everyone, a teacher only sees themself, a student only sees
-    #teachers of their own enrolled courses. Prevents a teacher from reading
-    #an arbitrary teacher's picture, and a student from reading an
-    #unauthorized teacher's picture by changing the ID in the URL.
     scoped_qs = apply_data_scope(user, Teacher.objects.all(), 'teacher')
     if not scoped_qs.filter(id = teacher_id).exists():
         return JsonResponse({"error": Messages.FORBIDDEN}, status = 403)

@@ -82,8 +82,6 @@ class TeacherRepository(BaseRepository):
             teacher.save()
         return teacher
 
-    #The only writer of profile_picture_key. Bypasses fill()/validator since this
-    #is never part of the regular teacher create/update payload. Lives on User.
     def update_profile_picture_key(self, teacher, key):
         user = teacher.user
         user.profile_picture_key = key

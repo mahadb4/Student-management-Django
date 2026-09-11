@@ -97,12 +97,8 @@ class StudentService:
         self.cache.invalidate_on_write(student_id)
         return result
 
-    #Backend derives the key itself (students/<id>/profile.<ext>) - the caller
-    #only picks the content type. s3_service is passed in rather than stored on
-    #the instance so existing StudentService(validator, repository, cache)
-    #call sites/tests are unaffected.
     def generate_profile_picture_upload_url(self,student_id,content_type,s3_service):
-        self.repository.get(student_id)  #raises Student.DoesNotExist if invalid
+        self.repository.get(student_id)
 
         extension = extension_for_content_type(content_type)
         key = f"students/{student_id}/profile.{extension}"
@@ -110,10 +106,6 @@ class StudentService:
 
         return {"upload_url":upload_url,"key":key,"content_type":content_type}
 
-    #Never trusts the frontend saying "upload succeeded" - verifies the object
-    #actually exists (and is within size limits) via head_object() before ever
-    #touching the database. The old object is only deleted AFTER the DB write
-    #for the new one succeeds.
     def confirm_profile_picture_upload(self,student_id,key,s3_service):
         student = self.repository.get(student_id)
 
@@ -139,8 +131,6 @@ class StudentService:
 
         return student
 
-    #Fresh presigned URL every call - never stored in the DB, never stored in
-    #Redis (the cached detail entry only ever holds the Student model/key).
     def get_profile_picture_view_url(self,student_id,s3_service):
         student = self.get(student_id)
         if not student.user.profile_picture_key:

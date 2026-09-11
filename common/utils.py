@@ -140,10 +140,6 @@ def build_paginated_payload(queryset,
     }
 
 
-#Validates a client-supplied Content-Type against the profile-picture allowlist
-#and returns the file extension to use in the S3 key. Never trusts the client
-#for anything beyond picking the extension - the object itself is re-checked
-#server-side (size/type) at confirm time via S3Service.head_object().
 def extension_for_content_type(content_type):
     normalized = (content_type or "").strip().lower()
 
@@ -153,11 +149,21 @@ def extension_for_content_type(content_type):
     return PROFILE_PICTURE_CONTENT_TYPES[normalized]
 
 
-#Turns each list-payload item's cached `profile_picture_key` into a FRESH
-#presigned `profile_picture_url`, generated after the item leaves the Redis
-#list cache (build_paginated_payload's output is what gets cached) so a signed
-#URL is never itself written to Redis. Presigning is local HMAC computation,
-#not an S3 API call, so this adds no network round trips / no N+1 queries.
+# Generic version of extension_for_content_type() - added rather than
+# generalizing that one in place, so profile pictures (the only existing
+# caller) are left untouched. Used by assignments for both the attachment
+# and the submission upload flows, which accept a different set of types.
+def extension_for_allowed_content_type(content_type, allowed_types, invalid_message):
+    normalized = (content_type or "").strip().lower()
+
+    if normalized not in allowed_types:
+        raise ValueError(invalid_message.format(content_type))
+
+    return allowed_types[normalized]
+
+
+#Converts each item's profile_picture_key into a fresh profile_picture_url -
+#called after the cache lookup, so signed URLs never get written to Redis.
 def attach_profile_picture_urls(results, s3_service):
     for item in results:
         key = item.pop("profile_picture_key", None)

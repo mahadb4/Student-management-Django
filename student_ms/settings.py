@@ -29,6 +29,8 @@ INSTALLED_APPS = [
     'enrollments',
     'departments',
     'attendance',
+    'remarks',
+    'assignments',
     'course_offerings',
     'semesters',
     'sections',

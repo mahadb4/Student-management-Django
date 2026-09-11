@@ -70,9 +70,6 @@ def student_api(request, student_id = None):
             page_number, page_size = resolve_pagination_params(request)
             ordering = resolve_ordering_param(request, ORDERING_FIELDS, DEFAULT_ORDERING)
             payload = student_service.get_list(request.user, search, page_number, page_size, department_id, ordering)
-            #Signed URLs are generated here, AFTER the cache lookup, so the cached
-            #payload (a cache hit or a fresh loader() result) only ever carries the
-            #raw profile_picture_key - never a presigned URL.
             payload["results"] = attach_profile_picture_urls(payload["results"], s3_service)
             return JsonResponse(payload)
 
@@ -215,8 +212,6 @@ def my_summary_api(request):
     })
 
 
-#── Profile picture (self-service, "me") ──────────────────────────────────────
-
 def _get_own_student(request):
     from common.permissions import authenticate_request
     user, error = authenticate_request(request)
@@ -304,8 +299,6 @@ def my_profile_picture_api(request):
     return JsonResponse({"error": Messages.METHOD_NOT_ALLOWED}, status = 405)
 
 
-#── Profile picture (viewed by admin/teacher/self via id) ─────────────────────
-
 def student_profile_picture_api(request, student_id):
     if request.method != "GET":
         return JsonResponse({"error": Messages.METHOD_NOT_ALLOWED}, status = 405)
@@ -315,11 +308,6 @@ def student_profile_picture_api(request, student_id):
     if error:
         return error
 
-    #Reuses the exact same data-scope rule as the main student_api endpoint:
-    #admin sees everyone, a teacher only sees students enrolled in their own
-    #course offerings, a student only sees themself. Prevents a student from
-    #reading another student's picture by changing the ID in the URL, and a
-    #teacher from reading an arbitrary student's picture.
     scoped_qs = apply_data_scope(user, student_repository.get_queryset_for_list(), 'student')
     if not scoped_qs.filter(id = student_id).exists():
         return JsonResponse({"error": Messages.FORBIDDEN}, status = 403)
