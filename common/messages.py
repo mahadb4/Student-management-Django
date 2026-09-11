@@ -169,6 +169,43 @@ class Messages:
     ATTENDANCE_COURSE_OFFERING_NOT_ASSIGNED = "You are not assigned to this course offering."
     ATTENDANCE_ENROLLMENT_NOT_FOUND = "Enrollment not found or is not active."
 
+    # ── Remark ────────────────────────────────────────────────────────────────
+    REMARK_CREATED = "Remark created successfully."
+    REMARK_UPDATED = "Remark updated successfully."
+    REMARK_DELETED = "Remark deleted successfully."
+    REMARK_NOT_FOUND_BY_ID = "Remark with ID {} not found."
+    REMARK_ID_REQUIRED = "Remark ID is required."
+    REMARK_TEXT_REQUIRED = "Remark text is required."
+    REMARK_STUDENT_REQUIRED = "Student is required."
+    REMARK_COURSE_OFFERING_REQUIRED = "Course offering is required."
+    REMARK_INVALID_VISIBILITY = "Invalid visibility '{}'. Must be one of: {}."
+    REMARK_TEACHER_NOT_FOUND = "Teacher profile not found for the current user."
+    REMARK_STUDENT_NOT_ENROLLED = "Student with ID {} is not enrolled in this course offering."
+    REMARK_NOT_OWNED = "You can only modify remarks you created."
+    REMARK_NOT_AUTHORIZED_FOR_STUDENT = "You are not authorized to add remarks for this student in this course offering."
+
+    # ── Assignment ────────────────────────────────────────────────────────────
+    ASSIGNMENT_NOT_FOUND_BY_ID = "Assignment with ID {} not found."
+    ASSIGNMENT_ID_REQUIRED = "Assignment ID is required."
+    ASSIGNMENT_TITLE_REQUIRED = "Title is required."
+    ASSIGNMENT_DUE_AT_REQUIRED = "Due date is required."
+    ASSIGNMENT_DUE_AT_INVALID = "Invalid due date format."
+    ASSIGNMENT_COURSE_OFFERING_REQUIRED = "Course offering is required."
+    ASSIGNMENT_TEACHER_NOT_FOUND = "Teacher profile not found for the current user."
+    ASSIGNMENT_STUDENT_NOT_FOUND = "Student profile not found for the current user."
+    ASSIGNMENT_NOT_AUTHORIZED_FOR_OFFERING = "You are not authorized to create assignments for this course offering."
+    ASSIGNMENT_NOT_OWNED = "You can only modify assignments you created."
+    ASSIGNMENT_FILE_CONTENT_TYPE_REQUIRED = "content_type is required."
+    ASSIGNMENT_FILE_INVALID_CONTENT_TYPE = "Unsupported file type '{}'. Allowed types: PDF, DOC, DOCX, ZIP."
+    ASSIGNMENT_FILE_TOO_LARGE = "File exceeds the maximum allowed size of {} MB."
+    ASSIGNMENT_FILE_KEY_REQUIRED = "key is required."
+    ASSIGNMENT_FILE_KEY_MISMATCH = "The provided key does not belong to this assignment."
+    ASSIGNMENT_FILE_UPLOAD_NOT_FOUND = "No uploaded object was found for this key. Upload the file to S3 before confirming."
+    ASSIGNMENT_PAST_DUE = "The due date for this assignment has passed."
+    SUBMISSION_NOT_ENROLLED = "You are not enrolled in the course this assignment belongs to."
+    SUBMISSION_FILE_KEY_MISMATCH = "The provided key does not belong to your submission."
+    SUBMISSION_NOT_FOUND = "No submission found."
+
     # ── Profile Picture ───────────────────────────────────────────────────────
     PROFILE_PICTURE_CONTENT_TYPE_REQUIRED = "content_type is required."
     PROFILE_PICTURE_INVALID_CONTENT_TYPE = (

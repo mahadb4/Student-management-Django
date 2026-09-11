@@ -51,7 +51,7 @@ class EnrollmentMapper:
             course_code = enrollment.course_offering.course.code,
             teacher_name = teacher_name,
             section_name = section_name,
-            teacher_id = enrollment.course_offering.teacher_id,
+            course_offering_id = enrollment.course_offering_id,
             profile_picture_key = (
                 enrollment.course_offering.teacher.user.profile_picture_key
                 if enrollment.course_offering.teacher_id else None
@@ -70,26 +70,20 @@ class EnrollmentMapper:
             course_name = enrollment.course_offering.course.name,
         ).to_dict()
 
-    # Used only by the authenticated Teacher's own /teachers/me/students/ -
-    # drops the teacher's own identity (already known: it's them) and any raw
-    # ids. The class filter dropdown on the Students/Attendance pages is built
-    # from a separate CourseOffering reference call, not from a field here -
-    # confirmed course_offering_id was unread by both consumers and dropped.
+    # Used only by the authenticated Teacher's own /teachers/me/students/,
+    # which (since the "All Classes" option was removed from its caller) is
+    # ALWAYS called with a single ?course_offering_id= - so course_name/
+    # course_code/section_name/course_offering_id would be identical on every
+    # row of a given response: redundant data the caller already has (it's
+    # the id it just filtered by, and its label is already shown once in the
+    # page's own class selector). Only per-student fields are returned here.
     @staticmethod
     def to_teacher_list_dto(enrollment):
-        section_name = (
-            enrollment.course_offering.section.name
-            if enrollment.course_offering.section_id else None
-        )
-
         return EnrollmentTeacherListDTO(
             enrollment_id = enrollment.id,
             student_id = enrollment.student_id,
             student_name = f"{enrollment.student.effective_first_name} {enrollment.student.effective_last_name}",
             student_email = enrollment.student.effective_email,
-            course_name = enrollment.course_offering.course.name,
-            course_code = enrollment.course_offering.course.code,
-            section_name = section_name,
             status = enrollment.status,
             profile_picture_key = enrollment.student.user.profile_picture_key,
         ).to_dict()

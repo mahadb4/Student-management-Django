@@ -132,8 +132,6 @@ def my_enrollments_api(request):
         qs = enrollment_repository.get_queryset_for_list().filter(student_id = student.id, is_deleted = False)
         page_number, page_size = resolve_pagination_params(request, default_page_size = 10)
         payload = build_paginated_payload(qs, page_number, page_size, EnrollmentMapper.to_student_list_dto)
-        #Signed teacher-picture URLs are generated here, from the raw
-        #profile_picture_key the DTO carries - never cached, never persisted.
         payload["results"] = attach_profile_picture_urls(payload["results"], s3_service)
         return JsonResponse(payload)
 
@@ -169,7 +167,9 @@ def my_enrollments_reference_api(request):
     # Minimal projection for the Student Attendance course filter dropdown -
     # reuses the same repository/scoping as my_enrollments_api above (only the
     # authenticated student's own, non-deleted enrollments), just mapped to a
-    # narrower DTO.
+    # narrower DTO. Restricted to ACTIVE: a DROPPED enrollment (e.g. the
+    # stale-duplicate side of a teacher reassignment) is a course the student
+    # is no longer taking, so it must not be selectable in this dropdown.
     if request.method != "GET":
         return JsonResponse({"error": Messages.METHOD_NOT_ALLOWED}, status = 405)
 
@@ -182,5 +182,7 @@ def my_enrollments_reference_api(request):
     if not student:
         return JsonResponse({"error": Messages.STUDENT_NOT_FOUND}, status = 404)
 
-    qs = enrollment_repository.get_queryset_for_list().filter(student_id = student.id, is_deleted = False)
+    qs = enrollment_repository.get_queryset_for_list().filter(
+        student_id = student.id, is_deleted = False, status = Enrollment.Status.ACTIVE,
+    )
     return paginate_queryset(request, qs, EnrollmentMapper.to_reference_dto, default_page_size = 10)

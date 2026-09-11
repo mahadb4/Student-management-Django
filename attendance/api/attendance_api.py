@@ -128,6 +128,16 @@ def my_attendance_api(request):
         return error
 
     qs = apply_data_scope(user, attendance_repository.get_queryset_for_list(), 'attendance')
+
+    # Optional: scope down to one class's attendance history (the Teacher
+    # Attendance page always has a class selected). Safe by construction even
+    # for a course_offering_id the caller doesn't teach - apply_data_scope
+    # above already restricts rows to this teacher's own offerings, so an
+    # unrelated id just yields zero additional rows, never someone else's.
+    course_offering_id = request.GET.get("course_offering_id")
+    if course_offering_id:
+        qs = qs.filter(enrollment__course_offering_id = course_offering_id)
+
     return paginate_queryset(request, qs, AttendanceMapper.to_teacher_list_dto, default_page_size = 10)
 
 
@@ -146,4 +156,21 @@ def my_student_attendance_api(request):
         return error
 
     qs = apply_data_scope(user, attendance_repository.get_queryset_for_list(), 'attendance')
+
+    # Optional: scope down to one course (the Student Attendance page's course
+    # filter). Mirrors my_attendance_api's course_offering_id filter above -
+    # apply_data_scope already restricts rows to this student's own
+    # enrollments, so an unrelated id just yields zero additional rows.
+    course_offering_id = request.GET.get("course_offering_id")
+    if course_offering_id:
+        qs = qs.filter(enrollment__course_offering_id = course_offering_id)
+
+    # Same idea, but keyed by enrollment id directly - the course-picker
+    # dropdown's option values are enrollment ids (matching the existing
+    # /students/me/courses/reference/ list), so this avoids needing a second
+    # id type just to select one course from that dropdown.
+    enrollment_id = request.GET.get("enrollment_id")
+    if enrollment_id:
+        qs = qs.filter(enrollment_id = enrollment_id)
+
     return paginate_queryset(request, qs, AttendanceMapper.to_student_list_dto, default_page_size = 10)
