@@ -156,8 +156,15 @@ def serialize_student_profile(student):
     }
 
 
+# The only fields a student may change about themself, mirroring what they
+# originally supply at onboarding - never department/section/enrollment/status,
+# which stay admin-controlled even if a client sends them in the PATCH body.
+STUDENT_SELF_EDITABLE_FIELDS = ("date_of_birth", "gender", "address", "parents_phone_number")
+
+
+@csrf_exempt
 def my_profile_api(request):
-    if request.method != "GET":
+    if request.method not in ("GET", "PATCH"):
         return JsonResponse({"error": Messages.METHOD_NOT_ALLOWED}, status = 405)
 
     from common.permissions import authenticate_request
@@ -169,7 +176,26 @@ def my_profile_api(request):
     if not student:
         return JsonResponse({"error": Messages.STUDENT_NOT_FOUND}, status = 404)
 
-    return JsonResponse(serialize_student_profile(student))
+    if request.method == "GET":
+        return JsonResponse(serialize_student_profile(student))
+
+    try:
+        data = json.loads(request.body)
+        if not isinstance(data, dict):
+            raise ValueError(Messages.REQUEST_BODY_MUST_BE_JSON_OBJECT)
+
+        # Whitelist before handing off to the shared update path - resolving
+        # `student` from request.user above already guarantees this can only
+        # ever touch the caller's own record.
+        allowed_data = {field: data[field] for field in STUDENT_SELF_EDITABLE_FIELDS if field in data}
+        student_service.update(student.id, allowed_data, partial = True)
+        return JsonResponse({"message": Messages.STUDENT_UPDATED})
+
+    except json.JSONDecodeError:
+        return JsonResponse({"error": Messages.INVALID_JSON}, status = 400)
+
+    except ValueError as e:
+        return JsonResponse({"error": str(e)}, status = 400)
 
 
 def my_summary_api(request):

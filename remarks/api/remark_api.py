@@ -33,6 +33,9 @@ def serialize_remark_for_teacher(remark):
 # Student view: aggregates remarks across different classes/teachers, so
 # course/teacher names are needed to tell rows apart. The student's own
 # identity and the authoring teacher's raw id aren't needed for display.
+# "visibility" is omitted here (unlike the teacher serializer) because a
+# student only ever sees their own already-STUDENT_VISIBLE remarks and the
+# UI never reads the field.
 def serialize_remark_for_student(remark):
     return {
         "id": remark.id,
@@ -40,7 +43,6 @@ def serialize_remark_for_student(remark):
         "course_name": remark.course_offering.course.name,
         "course_code": remark.course_offering.course.code,
         "remark_text": remark.remark_text,
-        "visibility": remark.visibility,
         "created_at": remark.created_at,
     }
 
