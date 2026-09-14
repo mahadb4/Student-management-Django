@@ -3,6 +3,7 @@ from django.db import transaction
 from common.constants import MAX_PROFILE_PICTURE_SIZE_BYTES, PROFILE_PICTURE_URL_EXPIRY_SECONDS
 from common.messages import Messages
 from common.permissions import apply_data_scope
+from common.services.image_service import ImageProcessingError, generate_avatar_thumbnail
 from common.utils import apply_ordering, build_full_name, build_paginated_payload, extension_for_content_type
 from students.mappers.student_mapper import StudentMapper
 from students.repositories.student_repository import ORDERING_FIELDS
@@ -121,6 +122,18 @@ class StudentService:
         if content_length > MAX_PROFILE_PICTURE_SIZE_BYTES:
             s3_service.delete_object(key)
             raise ValueError(Messages.PROFILE_PICTURE_TOO_LARGE.format(MAX_PROFILE_PICTURE_SIZE_BYTES // (1024 * 1024)))
+
+        # Replace the just-uploaded original with a small square thumbnail -
+        # see TeacherService.confirm_profile_picture_upload for why.
+        try:
+            thumbnail_bytes, thumbnail_content_type = generate_avatar_thumbnail(
+                s3_service.get_object_bytes(key), metadata.get("content_type"),
+            )
+        except ImageProcessingError as e:
+            s3_service.delete_object(key)
+            raise ValueError(str(e))
+
+        s3_service.put_object_bytes(key, thumbnail_bytes, thumbnail_content_type)
 
         old_key = student.user.profile_picture_key
         self.repository.update_profile_picture_key(student,key)

@@ -2,6 +2,7 @@ from enrollments.dtos.enrollment_list_dto import EnrollmentListDTO
 from enrollments.dtos.student_enrollment_list_dto import StudentEnrollmentListDTO
 from enrollments.dtos.enrollment_reference_dto import EnrollmentReferenceDTO
 from enrollments.dtos.enrollment_teacher_list_dto import EnrollmentTeacherListDTO
+from enrollments.dtos.enrollment_attendance_roster_dto import EnrollmentAttendanceRosterDTO
 
 
 class EnrollmentMapper:
@@ -85,5 +86,19 @@ class EnrollmentMapper:
             student_name = f"{enrollment.student.effective_first_name} {enrollment.student.effective_last_name}",
             student_email = enrollment.student.effective_email,
             status = enrollment.status,
+            profile_picture_key = enrollment.student.user.profile_picture_key,
+        ).to_dict()
+
+    # Used only by the Teacher Attendance register's roster fetch
+    # (/teachers/me/students/?view=attendance) - that page marks/displays
+    # attendance per student and never renders email or enrollment status, so
+    # this purpose-specific projection drops both instead of reusing
+    # to_teacher_list_dto's fuller shape (which My Students/ClassStudents.tsx
+    # still needs unchanged).
+    @staticmethod
+    def to_attendance_roster_dto(enrollment):
+        return EnrollmentAttendanceRosterDTO(
+            enrollment_id = enrollment.id,
+            student_name = f"{enrollment.student.effective_first_name} {enrollment.student.effective_last_name}",
             profile_picture_key = enrollment.student.user.profile_picture_key,
         ).to_dict()

@@ -1,6 +1,7 @@
 from course_offerings.dtos.course_offering_list_dto import CourseOfferingListDTO
 from course_offerings.dtos.course_offering_reference_dto import CourseOfferingReferenceDTO
 from course_offerings.dtos.course_offering_teacher_list_dto import CourseOfferingTeacherListDTO
+from course_offerings.dtos.course_offering_attendance_list_dto import CourseOfferingAttendanceListDTO
 
 
 class CourseOfferingMapper:
@@ -72,4 +73,22 @@ class CourseOfferingMapper:
             section_name = section_name,
             is_active = offering.is_active,
             enrolled_students_count = offering.enrolled_students_count,
+        ).to_dict()
+
+    # Used only by the Teacher Attendance page's class dropdown
+    # (/teachers/me/courses/?view=attendance) - that dropdown only ever
+    # renders "<course_name> - <section_name>" and reads `id` to scope the
+    # roster/attendance requests, so this drops course_code/semester/
+    # academic_year/is_active/enrolled_students_count entirely instead of
+    # reusing to_teacher_list_dto's fuller shape (which My Classes/Courses.tsx
+    # still needs unchanged).
+    @staticmethod
+    def to_attendance_list_dto(offering):
+        course_name = offering.course.name if offering.course_id else None
+        section_name = offering.section.name if offering.section_id else None
+
+        return CourseOfferingAttendanceListDTO(
+            id = offering.id,
+            course_name = course_name,
+            section_name = section_name,
         ).to_dict()

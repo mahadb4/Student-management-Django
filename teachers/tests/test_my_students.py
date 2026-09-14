@@ -114,3 +114,15 @@ class MyTeacherStudentsApiTests(TestCase):
             set(row.keys()),
             {"enrollment_id", "student_id", "student_name", "student_email", "status", "profile_picture_url"},
         )
+
+    def test_attendance_view_returns_a_narrower_projection(self):
+        # ?view=attendance is opt-in for the Attendance register only - the
+        # default (above) is unchanged for every other caller (My Students).
+        response = self.client.get(
+            f"/api/teachers/me/students/?course_offering_id={self.offering_a.id}&view=attendance",
+            **self._auth_headers(self.teacher_a.user),
+        )
+        self.assertEqual(response.status_code, 200)
+        row = response.json()["results"][0]
+        self.assertEqual(set(row.keys()), {"enrollment_id", "student_name", "profile_picture_url"})
+        self.assertEqual(row["student_name"], "Student A")

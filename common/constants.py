@@ -14,6 +14,13 @@ PROFILE_PICTURE_CONTENT_TYPES = {
 }
 MAX_PROFILE_PICTURE_SIZE_BYTES = 5 * 1024 * 1024  # 5 MB
 PROFILE_PICTURE_URL_EXPIRY_SECONDS = 300  # 5 minutes, for both upload and view URLs
+# Every consumer (admin Students/Teachers lists, Attendance register, "My
+# Courses" teacher avatar, the uploader's own preview) renders this at well
+# under 40px - a square this size still looks sharp there, and downscaling
+# from it (instead of from a multi-megapixel original) is what avoids the
+# blurry-avatar look a browser produces scaling a huge source image straight
+# down to a tiny circle.
+PROFILE_PICTURE_THUMBNAIL_SIZE = 256
 
 # ── Assignment attachments / submissions (S3) ───────────────────────────────
 # Same key-by-Content-Type approach as PROFILE_PICTURE_CONTENT_TYPES.

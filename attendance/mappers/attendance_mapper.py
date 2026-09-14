@@ -38,9 +38,10 @@ class AttendanceMapper:
         ).to_dict()
 
     # Used only by the authenticated Teacher's own /teachers/me/attendance/ -
-    # drops student_id/course_id (unused by the Attendance table), keeps
-    # enrollment_id (needed for the class filter) and student_name (the row
-    # identifies which of the teacher's students it belongs to).
+    # drops student_id/course_id/remarks/student_name: the Attendance page
+    # fetches the class roster separately (/teachers/me/students/) and maps
+    # each history row back to a student via enrollment_id client-side, so
+    # repeating student_name here would just be redundant weight on every row.
     @staticmethod
     def to_teacher_list_dto(attendance):
         has_enrollment = attendance.enrollment_id is not None
@@ -49,7 +50,5 @@ class AttendanceMapper:
             id = attendance.id,
             date = attendance.date,
             status = attendance.status,
-            remarks = attendance.remarks,
             enrollment_id = attendance.enrollment_id if has_enrollment else None,
-            student_name = f"{attendance.enrollment.student.effective_first_name} {attendance.enrollment.student.effective_last_name}" if has_enrollment else None,
         ).to_dict()

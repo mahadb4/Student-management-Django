@@ -6,8 +6,13 @@ class AttendanceRepository(BaseRepository):
         super().__init__(Attendance)
 
     def get_queryset_for_list(self):
-        #Most recent attendance first (by the actual attendance date, not id/
-        #created_at), with -id as a deterministic tiebreaker for same-date rows.
+        #Alphabetical by student name - same ordering the Teacher Attendance
+        #register uses for its class roster (EnrollmentRepository's
+        #DEFAULT_ORDERING = "name", i.e. student__user__name), so the Admin
+        #Attendance page's per-class/per-date view reads as the same class
+        #list a teacher would see, not an arbitrary attendance-record order.
+        #-date/-id remain as tiebreakers for same-name rows (e.g. once this
+        #queryset spans more than one date/session).
         return self.model.objects.select_related(
             "enrollment__student__user","enrollment__course_offering__course",
         ).only(
@@ -16,7 +21,7 @@ class AttendanceRepository(BaseRepository):
             "enrollment__student__user__email",
             "enrollment__course_offering__id","enrollment__course_offering__course__id",
             "enrollment__course_offering__course__code",
-        ).order_by("-date","-id")
+        ).order_by("enrollment__student__user__name","-date","-id")
 
     def get_by_enrollment_and_date(self,enrollment_id,attendance_date):
         return self.model.objects.filter(
