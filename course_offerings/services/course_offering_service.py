@@ -43,16 +43,16 @@ class CourseOfferingService:
     #    enrollment_service._validate_student_section. Enrolment itself is still
     #    authorised by that validator on POST; this only widens what is visible
     #    to browse, never what may be enrolled in.
-    def get_reference_list(self,user,search,page,page_size):
+    def get_reference_list(self,user,search,page,page_size,teacher_id=None):
         scope_token = self.cache.reference_scope_token_for(user)
 
         def loader():
-            queryset = self._reference_queryset(user,search)
+            queryset = self._reference_queryset(user,search,teacher_id)
             return build_paginated_payload(queryset,page,page_size,CourseOfferingMapper.to_reference_dto)
 
         payload = self.cache.get_or_load_list(
             scope_token,search,page,page_size,loader,
-            filters = self.cache.REFERENCE_FILTERS,
+            filters = {**self.cache.REFERENCE_FILTERS, "teacher_id": teacher_id},
         )
 
         return self._exclude_already_enrolled(user,payload)
@@ -91,17 +91,22 @@ class CourseOfferingService:
             ],
         }
 
-    def _reference_queryset(self,user,search):
+    def _reference_queryset(self,user,search,teacher_id=None):
         kind,profile = get_scope_identity(user)
 
         if kind == "student":
-            return self.repository.get_queryset_for_discovery(
+            queryset = self.repository.get_queryset_for_discovery(
                 section_id = profile.section_id, search = search,
             )
+        else:
+            queryset = apply_data_scope(
+                user,self.repository.get_queryset_for_list(search = search),'courseoffering',
+            )
 
-        return apply_data_scope(
-            user,self.repository.get_queryset_for_list(search = search),'courseoffering',
-        )
+        if teacher_id is not None:
+            queryset = queryset.filter(teacher_id = teacher_id)
+
+        return queryset
 
     #Used only by the legacy server-rendered template view.
     def get_all(self):

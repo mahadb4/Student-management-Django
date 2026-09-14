@@ -138,6 +138,13 @@ def course_offering_reference_api(request):
 
     search = request.GET.get("search", "").strip() or None
 
+    # Optional dependent-dropdown filter for the Admin Attendance page's
+    # Course/Section step: once a Teacher is selected, only that teacher's own
+    # offerings should be selectable. ORM-filtered alongside the existing scope,
+    # not fetched broadly and narrowed client-side.
+    teacher_id_param = request.GET.get("teacher_id", "").strip()
+    teacher_id = int(teacher_id_param) if teacher_id_param.isdigit() else None
+
     # Admins and teachers keep their normal data scope here. Students get
     # section-matched DISCOVERY instead of their enrolment-based scope, which
     # otherwise made the "Available Offerings" tab permanently empty (it returned
@@ -149,7 +156,7 @@ def course_offering_reference_api(request):
 
     return JsonResponse(
         course_offering_service.get_reference_list(
-            request.user, search, page_number, page_size,
+            request.user, search, page_number, page_size, teacher_id,
         )
     )
 
@@ -167,5 +174,13 @@ def my_course_offerings_api(request):
     if not teacher:
         return JsonResponse({"error": Messages.TEACHER_NOT_FOUND}, status = 404)
 
+    # Opt-in narrower projection for the Attendance register (?view=attendance) -
+    # every other caller (the My Classes page) keeps the fuller default shape.
+    mapper_func = (
+        CourseOfferingMapper.to_attendance_list_dto
+        if request.GET.get("view") == "attendance"
+        else CourseOfferingMapper.to_teacher_list_dto
+    )
+
     qs = course_offering_repository.get_queryset_for_teacher_list(teacher.id)
-    return paginate_queryset(request, qs, CourseOfferingMapper.to_teacher_list_dto, default_page_size = 10)
+    return paginate_queryset(request, qs, mapper_func, default_page_size = 10)

@@ -32,6 +32,40 @@ def serialize_attendance(attendance):
 from common.decorators import enforce_permissions
 from attendance.mappers.attendance_mapper import AttendanceMapper
 
+
+#Admin Attendance page filters (Department -> Teacher -> Course Offering ->
+#Date). All ORM-level (.filter() on the queryset already scoped by
+#apply_data_scope above) - never fetched broadly and filtered in Python.
+#Every param is optional and independent so a teacher/student's own scoped
+#queryset (from apply_data_scope) is only ever narrowed further, never widened.
+def _apply_admin_filters(request, queryset):
+    department_id = request.GET.get("department_id", "").strip()
+    if department_id:
+        queryset = queryset.filter(enrollment__course_offering__teacher__department_id = department_id)
+
+    teacher_id = request.GET.get("teacher_id", "").strip()
+    if teacher_id:
+        queryset = queryset.filter(enrollment__course_offering__teacher_id = teacher_id)
+
+    course_offering_id = request.GET.get("course_offering_id", "").strip()
+    if course_offering_id:
+        queryset = queryset.filter(enrollment__course_offering_id = course_offering_id)
+
+    section_id = request.GET.get("section_id", "").strip()
+    if section_id:
+        queryset = queryset.filter(enrollment__course_offering__section_id = section_id)
+
+    student_id = request.GET.get("student_id", "").strip()
+    if student_id:
+        queryset = queryset.filter(enrollment__student_id = student_id)
+
+    date = request.GET.get("date", "").strip()
+    if date:
+        queryset = queryset.filter(date = date)
+
+    return queryset
+
+
 @csrf_exempt
 @enforce_permissions('attendance', 'attendance')
 def attendance_api(request, attendance_id = None):
@@ -48,6 +82,7 @@ def attendance_api(request, attendance_id = None):
                 return JsonResponse(serialize_attendance(attendance))
 
             attendances = apply_data_scope(request.user, attendance_repository.get_queryset_for_list(), 'attendance')
+            attendances = _apply_admin_filters(request, attendances)
             return paginate_queryset(request, attendances, AttendanceMapper.to_list_dto)
 
         if request.method in ("POST", "PUT", "PATCH"):
@@ -107,6 +142,59 @@ def attendance_api(request, attendance_id = None):
 
     except ProtectedError:
         return JsonResponse({"error": Messages.ATTENDANCE_CANNOT_BE_DELETED.format(attendance_id)}, status = 409)
+
+    except json.JSONDecodeError:
+        return JsonResponse({"error": Messages.INVALID_JSON}, status = 400)
+
+    except ValueError as e:
+        return JsonResponse({"error": str(e)}, status = 400)
+
+
+def serialize_bulk_attendance(attendance):
+    # enrollment_id explicit (unlike serialize_attendance's "enrollment" key)
+    # - the frontend needs it to map each created row back to which student's
+    # marking-column entry it came from.
+    return {
+        "id": attendance.id,
+        "enrollment_id": attendance.enrollment_id,
+        "date": attendance.date,
+        "status": attendance.status,
+        "remarks": attendance.remarks,
+    }
+
+
+@csrf_exempt
+@enforce_permissions('attendance', 'attendance')
+def attendance_bulk_api(request):
+    # POST /attendance/bulk/ - one class + one date = one logical write,
+    # instead of the frontend looping POST /attendance/ once per student.
+    # Same authorization shape as attendance_api's own POST branch above
+    # (Teacher-profile required, ownership enforced in the service) -
+    # deliberately not touched/widened here.
+    if request.method != "POST":
+        return JsonResponse({"error": Messages.METHOD_NOT_ALLOWED}, status = 405)
+
+    try:
+        teacher = Teacher.objects.filter(
+            user = request.user,
+            is_deleted = False,
+            is_active = True,
+        ).first()
+
+        if not teacher:
+            return JsonResponse({"error": Messages.ATTENDANCE_TEACHER_NOT_FOUND}, status = 400)
+
+        data = json.loads(request.body)
+
+        if not isinstance(data, dict):
+            raise ValueError(Messages.REQUEST_BODY_MUST_BE_JSON_OBJECT)
+
+        created = attendance_service.create_bulk(
+            data.get("course_offering_id"), data.get("date"), data.get("records"), teacher,
+        )
+        return JsonResponse(
+            {"created": [serialize_bulk_attendance(a) for a in created]}, status = 201,
+        )
 
     except json.JSONDecodeError:
         return JsonResponse({"error": Messages.INVALID_JSON}, status = 400)

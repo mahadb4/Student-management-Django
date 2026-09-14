@@ -170,6 +170,7 @@ def my_students_api(request):
 
     from common.permissions import authenticate_request, apply_data_scope
     from common.utils import apply_ordering
+    from enrollments.models import Enrollment
     from enrollments.repositories.enrollment_repository import DEFAULT_ORDERING, ORDERING_FIELDS, EnrollmentRepository
     from enrollments.mappers.enrollment_mapper import EnrollmentMapper
 
@@ -180,7 +181,12 @@ def my_students_api(request):
     # Reuses apply_data_scope's existing teacher branch for 'enrollment':
     # enrollments in this teacher's own course offerings - the same scoping
     # rule already used by the general /enrollments/ list, just resolved for `me`.
-    qs = apply_data_scope(user, EnrollmentRepository().get_queryset_for_list(), 'enrollment')
+    # ACTIVE-only: a DROPPED/COMPLETED enrollment is not a student currently
+    # taking the class, so it must never appear in the roster the Attendance
+    # register marks against (this was previously unfiltered here).
+    qs = apply_data_scope(user, EnrollmentRepository().get_queryset_for_list(), 'enrollment').filter(
+        status = Enrollment.Status.ACTIVE,
+    )
 
     # Optional: scope down to one class's roster (e.g. for marking attendance,
     # where every student in the selected class must be selectable, not just
@@ -195,8 +201,16 @@ def my_students_api(request):
     # student__user__name) - reused here rather than left unsorted.
     qs = apply_ordering(qs, DEFAULT_ORDERING, ORDERING_FIELDS)
 
+    # Opt-in narrower projection for the Attendance register (?view=attendance) -
+    # every other caller (the My Students page) keeps the fuller default shape.
+    mapper_func = (
+        EnrollmentMapper.to_attendance_roster_dto
+        if request.GET.get("view") == "attendance"
+        else EnrollmentMapper.to_teacher_list_dto
+    )
+
     page_number, page_size = resolve_pagination_params(request, default_page_size = 10)
-    payload = build_paginated_payload(qs, page_number, page_size, EnrollmentMapper.to_teacher_list_dto)
+    payload = build_paginated_payload(qs, page_number, page_size, mapper_func)
     payload["results"] = attach_profile_picture_urls(payload["results"], s3_service)
     return JsonResponse(payload)
 

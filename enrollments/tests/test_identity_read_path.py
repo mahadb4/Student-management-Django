@@ -90,9 +90,10 @@ class TransitiveIdentityReadPathTests(TestCase):
         self.assertIn(self.enrollment.id, results.values_list("id", flat = True))
 
     def test_attendance_student_name_uses_effective_identity(self):
+        # AttendanceMapper.to_teacher_list_dto() no longer carries student_name
+        # at all (the Attendance page maps enrollment_id -> student via a
+        # separate roster fetch instead - see attendance_mapper.py) - only
+        # the admin-facing to_list_dto still resolves an identity-derived name.
         attendance = AttendanceRepository().get_queryset_for_list().get(id = self.attendance.id)
         dto = AttendanceMapper.to_list_dto(attendance)
         self.assertEqual(dto["student_name"], "Linked Student")
-
-        teacher_dto = AttendanceMapper.to_teacher_list_dto(attendance)
-        self.assertEqual(teacher_dto["student_name"], "Linked Student")

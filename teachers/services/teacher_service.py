@@ -3,6 +3,7 @@ from django.db import transaction
 from common.constants import MAX_PROFILE_PICTURE_SIZE_BYTES, PROFILE_PICTURE_URL_EXPIRY_SECONDS
 from common.messages import Messages
 from common.permissions import apply_data_scope
+from common.services.image_service import ImageProcessingError, generate_avatar_thumbnail
 from common.utils import apply_ordering, build_full_name, build_paginated_payload, extension_for_content_type
 from teachers.mappers.teacher_mapper import TeacherMapper
 from teachers.repositories.teacher_repository import ORDERING_FIELDS
@@ -124,6 +125,21 @@ class TeacherService:
         if content_length > MAX_PROFILE_PICTURE_SIZE_BYTES:
             s3_service.delete_object(key)
             raise ValueError(Messages.PROFILE_PICTURE_TOO_LARGE.format(MAX_PROFILE_PICTURE_SIZE_BYTES // (1024 * 1024)))
+
+        # Replace the just-uploaded original with a small square thumbnail -
+        # every avatar consumer renders this at well under 40px, and
+        # downscaling from a multi-megapixel original straight to that size
+        # is what produced the blurry look. Same key, so no DB/key-tracking
+        # change is needed - only the object's bytes/content-type change.
+        try:
+            thumbnail_bytes, thumbnail_content_type = generate_avatar_thumbnail(
+                s3_service.get_object_bytes(key), metadata.get("content_type"),
+            )
+        except ImageProcessingError as e:
+            s3_service.delete_object(key)
+            raise ValueError(str(e))
+
+        s3_service.put_object_bytes(key, thumbnail_bytes, thumbnail_content_type)
 
         old_key = teacher.user.profile_picture_key
         self.repository.update_profile_picture_key(teacher,key)

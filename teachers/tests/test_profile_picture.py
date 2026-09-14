@@ -17,12 +17,25 @@ from teachers.services.teacher_validator import TeacherValidator
 from users.models import User
 
 
+#A tiny but real, valid JPEG - confirm_profile_picture_upload now runs
+#every upload through generate_avatar_thumbnail(), which needs bytes Pillow
+#can actually decode, not just a byte count.
+def _fake_uploaded_image_bytes():
+    from io import BytesIO
+    from PIL import Image
+
+    buffer = BytesIO()
+    Image.new("RGB", (20, 20), color = (50, 100, 200)).save(buffer, format = "JPEG")
+    return buffer.getvalue()
+
+
 #Hand-written in-memory fake of S3Service's public surface - no real AWS calls,
 #matching this repo's existing stub/fake test convention.
 class FakeS3Service:
 
     def __init__(self):
         self.objects = {}
+        self.data = {}  # key -> bytes (only what get_object_bytes/put_object_bytes need)
         self.deleted_keys = []
 
     def generate_upload_url(self, key, content_type, expires_in = 300):
@@ -41,10 +54,19 @@ class FakeS3Service:
 
     def delete_object(self, key):
         self.objects.pop(key, None)
+        self.data.pop(key, None)
         self.deleted_keys.append(key)
+
+    def get_object_bytes(self, key):
+        return self.data.get(key) or _fake_uploaded_image_bytes()
+
+    def put_object_bytes(self, key, data, content_type):
+        self.objects[key] = len(data)
+        self.data[key] = data
 
     def put(self, key, content_length = 1024):
         self.objects[key] = content_length
+        self.data[key] = _fake_uploaded_image_bytes()
 
 
 class ProfilePictureServiceTestBase(TestCase):

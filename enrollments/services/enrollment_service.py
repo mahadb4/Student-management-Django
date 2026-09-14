@@ -20,12 +20,12 @@ class EnrollmentService:
     #GET /api/enrollments/?page=&page_size=&search=
     #Scoped per user: admin sees all, a teacher those in their own offerings,
     #a student their own.
-    def get_list(self,user,search,page,page_size,ordering=None):
+    def get_list(self,user,search,page,page_size,ordering=None,course_offering_id=None):
         scope_token = self.cache.scope_token_for(user)
-        filters = {"ordering": ordering}
+        filters = {"ordering": ordering, "course_offering_id": course_offering_id}
 
         def loader():
-            queryset = self.repository.get_queryset_for_list(search = search)
+            queryset = self.repository.get_queryset_for_list(search = search, course_offering_id = course_offering_id)
             queryset = apply_data_scope(user,queryset,'enrollment')
             queryset = apply_ordering(queryset,ordering,ORDERING_FIELDS)
             return build_paginated_payload(queryset,page,page_size,EnrollmentMapper.to_list_dto)

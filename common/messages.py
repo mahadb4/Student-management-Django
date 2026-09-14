@@ -168,6 +168,8 @@ class Messages:
     ATTENDANCE_COURSE_OFFERING_NOT_FOUND = "Course offering not found."
     ATTENDANCE_COURSE_OFFERING_NOT_ASSIGNED = "You are not assigned to this course offering."
     ATTENDANCE_ENROLLMENT_NOT_FOUND = "Enrollment not found or is not active."
+    ATTENDANCE_BULK_PAYLOAD_INVALID = "course_offering_id, date and a non-empty records list are required."
+    ATTENDANCE_BULK_INCOMPLETE = "Attendance must include every active enrolled student for this course offering and date."
 
     # ── Remark ────────────────────────────────────────────────────────────────
     REMARK_CREATED = "Remark created successfully."

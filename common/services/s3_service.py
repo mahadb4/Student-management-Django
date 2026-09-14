@@ -55,3 +55,10 @@ class S3Service:
 
     def delete_object(self, key):
         self.client.delete_object(Bucket = self.bucket_name, Key = key)
+
+    def get_object_bytes(self, key):
+        response = self.client.get_object(Bucket = self.bucket_name, Key = key)
+        return response["Body"].read()
+
+    def put_object_bytes(self, key, data, content_type):
+        self.client.put_object(Bucket = self.bucket_name, Key = key, Body = data, ContentType = content_type)

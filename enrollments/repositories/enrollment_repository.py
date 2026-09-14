@@ -14,7 +14,7 @@ class EnrollmentRepository(BaseRepository):
     def __init__(self):
         super().__init__(Enrollment)
 
-    def get_queryset_for_list(self, search = None):
+    def get_queryset_for_list(self, search = None, course_offering_id = None):
         #No .order_by() here - final ordering is applied by the service, after
         #apply_data_scope(), via common.utils.apply_ordering() (see ORDERING_FIELDS above).
         queryset = self.model.objects.select_related(
@@ -40,6 +40,16 @@ class EnrollmentRepository(BaseRepository):
                     | Q(course_offering__course__name__icontains = term)
                     | Q(course_offering__course__code__icontains = term)
                 )
+
+        # Used by the Admin Attendance Add/Edit modal's enrollment picker
+        # (?course_offering_id=) to scope student choices to the selected
+        # offering only - restricted to ACTIVE so a dropped/completed
+        # enrollment isn't offered for marking new attendance.
+        if course_offering_id:
+            queryset = queryset.filter(
+                course_offering_id = course_offering_id,
+                status = Enrollment.Status.ACTIVE,
+            )
 
         return queryset
 
