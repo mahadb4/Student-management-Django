@@ -208,6 +208,13 @@ class Messages:
     SUBMISSION_FILE_KEY_MISMATCH = "The provided key does not belong to your submission."
     SUBMISSION_NOT_FOUND = "No submission found."
 
+    # ── AI Assignment Evaluation ─────────────────────────────────────────────
+    AI_EVALUATION_UNSUPPORTED_FORMAT = "AI evaluation isn't available for this file type yet. Only PDF submissions are currently supported."
+    AI_EVALUATION_UNAVAILABLE = "AI evaluation is temporarily unavailable. Please try again later."
+    AI_EVALUATION_NOT_FOUND = "No AI evaluation found for this submission."
+    AI_EVALUATION_SCORE_INVALID = "Score must be a whole number between 0 and 100."
+    AI_EVALUATION_STATUS_INVALID = "Invalid status '{}'. Must be one of: {}."
+
     # ── Profile Picture ───────────────────────────────────────────────────────
     PROFILE_PICTURE_CONTENT_TYPE_REQUIRED = "content_type is required."
     PROFILE_PICTURE_INVALID_CONTENT_TYPE = (
@@ -220,3 +227,8 @@ class Messages:
     )
     PROFILE_PICTURE_TOO_LARGE = "Profile picture exceeds the maximum allowed size of {} MB."
     PROFILE_PICTURE_NOT_FOUND = "No profile picture is set."
+
+    # ── AI Assistant ──────────────────────────────────────────────────────────
+    AI_ASSISTANT_QUESTION_REQUIRED = "Question is required."
+    AI_ASSISTANT_QUESTION_TOO_LONG = "Question must be at most {} characters."
+    AI_ASSISTANT_UNAVAILABLE = "The AI assistant is temporarily unavailable. Please try again later."

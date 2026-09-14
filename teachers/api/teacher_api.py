@@ -24,11 +24,20 @@ def serialize_teacher_profile(teacher):
     # first/last separately, so this profile-only DTO returns it pre-joined -
     # unlike serialize_teacher() below (Admin's CRUD), which keeps them split
     # since Admin's edit form needs them as separate inputs.
+    # phone_number/date_of_birth/gender/address/qualification are included so
+    # the Profile page's own edit form (PATCH /teachers/me/, TEACHER_SELF_EDITABLE_FIELDS
+    # below) can pre-fill with current values - salary/is_active/timestamps stay excluded
+    # since they're admin-only and never shown here.
     return {
         "id": teacher.id,
         "name": f"{teacher.effective_first_name} {teacher.effective_last_name}",
         "employee_id": teacher.employee_id,
         "email": teacher.effective_email,
+        "phone_number": teacher.phone_number,
+        "date_of_birth": str(teacher.user.date_of_birth) if teacher.user.date_of_birth else None,
+        "gender": teacher.user.gender,
+        "address": teacher.user.address,
+        "qualification": teacher.qualification,
         "department_name": teacher.department.name if teacher.department_id else None,
         "designation": teacher.designation,
         "profile_picture_url": teacher_service.get_profile_picture_view_url(teacher.id, s3_service),
@@ -144,8 +153,16 @@ def teacher_reference_api(request):
     return paginate_queryset(request, teachers, TeacherMapper.to_reference_dto, default_page_size = 10)
 
 
+# The only fields a teacher may change about themself, mirroring what they
+# originally supply at onboarding - never employee_id/department/designation/
+# date_of_joining/salary/status, which stay admin-controlled even if a client
+# sends them in the PATCH body.
+TEACHER_SELF_EDITABLE_FIELDS = ("phone_number", "date_of_birth", "gender", "address", "qualification")
+
+
+@csrf_exempt
 def my_profile_api(request):
-    if request.method != "GET":
+    if request.method not in ("GET", "PATCH"):
         return JsonResponse({"error": Messages.METHOD_NOT_ALLOWED}, status = 405)
 
     from common.permissions import authenticate_request
@@ -157,7 +174,26 @@ def my_profile_api(request):
     if not teacher:
         return JsonResponse({"error": Messages.TEACHER_NOT_FOUND}, status = 404)
 
-    return JsonResponse(serialize_teacher_profile(teacher))
+    if request.method == "GET":
+        return JsonResponse(serialize_teacher_profile(teacher))
+
+    try:
+        data = json.loads(request.body)
+        if not isinstance(data, dict):
+            raise ValueError(Messages.REQUEST_BODY_MUST_BE_JSON_OBJECT)
+
+        # Whitelist before handing off to the shared update path - resolving
+        # `teacher` from request.user above already guarantees this can only
+        # ever touch the caller's own record.
+        allowed_data = {field: data[field] for field in TEACHER_SELF_EDITABLE_FIELDS if field in data}
+        teacher_service.update(teacher.id, allowed_data, partial = True)
+        return JsonResponse({"message": Messages.TEACHER_UPDATED})
+
+    except json.JSONDecodeError:
+        return JsonResponse({"error": Messages.INVALID_JSON}, status = 400)
+
+    except ValueError as e:
+        return JsonResponse({"error": str(e)}, status = 400)
 
 
 def my_students_api(request):

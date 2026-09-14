@@ -35,3 +35,50 @@ class Submission(models.Model):
         ]
 
     def __str__(self): return f"{self.student} - {self.assignment}"
+
+
+class AssignmentEvaluation(models.Model):
+    """
+    Phase 11B: AI Assignment Evaluation. Holds two distinct things, kept
+    deliberately separate for auditability:
+
+    AI-generated (never trusted as final):
+        suggested_score, strengths, weaknesses, ai_feedback, confidence
+
+    Teacher-controlled (the only thing that is ever authoritative):
+        final_score, teacher_feedback, status
+
+    AI suggestion != final grade. final_score/teacher_feedback stay null/
+    blank until a teacher explicitly reviews and saves a decision - nothing
+    in this model or the services around it ever sets them automatically.
+
+    OneToOneField to Submission (same reasoning as RemarkEmbedding's
+    OneToOneField to Remark in Phase 3): one evaluation per submission,
+    automatic cascade-delete safety, and re-running "AI Check" updates this
+    same row rather than creating duplicates.
+    """
+    class Status(models.TextChoices):
+        AI_SUGGESTED = "AI_SUGGESTED", "AI Suggested"
+        APPROVED = "APPROVED", "Approved"
+        EDITED = "EDITED", "Edited"
+        REJECTED = "REJECTED", "Rejected"
+
+    submission = models.OneToOneField(Submission, on_delete=models.CASCADE, related_name="evaluation")
+
+    # AI-generated - a suggestion only.
+    suggested_score = models.PositiveIntegerField(null=True, blank=True)
+    strengths = models.JSONField(default=list, blank=True)
+    weaknesses = models.JSONField(default=list, blank=True)
+    ai_feedback = models.TextField(blank=True)
+    confidence = models.CharField(max_length=10, blank=True)
+
+    # Teacher-controlled - the only authoritative fields. Null/blank until
+    # a teacher actually reviews and saves a decision.
+    final_score = models.PositiveIntegerField(null=True, blank=True)
+    teacher_feedback = models.TextField(blank=True)
+
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.AI_SUGGESTED)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self): return f"Evaluation for {self.submission} ({self.status})"
