@@ -91,8 +91,8 @@ class RemarkApiPermissionTests(TestCase):
     def test_student_can_list_own_remarks_without_403(self):
         response = self.client.get("/api/remarks/", **self._auth_headers(self.student.user))
         self.assertEqual(response.status_code, 200)
-        ids = {row["id"] for row in response.json()["results"]}
-        self.assertIn(self.remark.id, ids)
+        remarks = {row["remark"] for row in response.json()["results"]}
+        self.assertIn(self.remark.remark_text, remarks)
 
     def test_teacher_can_create_remark_end_to_end(self):
         response = self.client.post(

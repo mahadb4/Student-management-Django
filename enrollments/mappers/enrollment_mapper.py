@@ -59,16 +59,25 @@ class EnrollmentMapper:
             ),
         ).to_dict()
 
-    # Used only by the Student Attendance course filter dropdown - the
-    # dropdown's option value/key is the enrollment id (matched against
-    # attendance rows' enrollment_id), and its label is course_name/course_code;
-    # nothing else from the enrollment is rendered there.
+    # Used by the Student Attendance course filter dropdown - the dropdown's
+    # option value/key is the enrollment id (matched against attendance
+    # rows' enrollment_id), course_name/course_code make up its label, and
+    # semester/academic_year/section_name back the "Term"/"Section" chips
+    # shown once a course is selected.
     @staticmethod
     def to_reference_dto(enrollment):
+        section_name = (
+            enrollment.course_offering.section.name
+            if enrollment.course_offering.section_id else None
+        )
+
         return EnrollmentReferenceDTO(
             id = enrollment.id,
             course_code = enrollment.course_offering.course.code,
             course_name = enrollment.course_offering.course.name,
+            semester = enrollment.course_offering.semester,
+            academic_year = enrollment.course_offering.academic_year,
+            section_name = section_name,
         ).to_dict()
 
     # Used only by the authenticated Teacher's own /teachers/me/students/,

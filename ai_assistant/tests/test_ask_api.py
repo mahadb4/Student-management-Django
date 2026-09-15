@@ -218,6 +218,44 @@ class AskApiTests(TestCase):
         self.assertEqual(data["answer"], _FakeGeminiGenerationService.fixed_answer)
         self.assertIn("sources", data)
 
+    # ── Casual conversation (end-to-end through the real HTTP endpoint) ────
+    # Proves the casual short-circuit reaches all the way through ask_api -
+    # a greeting never touches Gemini, and the response contract (still
+    # {"answer": str, "sources": [...]}) is unchanged. Student 57's own
+    # name ("Student 57") is used, matching build_casual_response's use of
+    # the authenticated user's actual name rather than a hardcoded one.
+
+    @patch("ai_assistant.orchestrator.GeminiGenerationService", _FakeGeminiGenerationService)
+    def test_casual_greeting_never_reaches_gemini(self):
+        _FakeGeminiGenerationService.last_question = None
+        response = self._post({"question": "hello"}, user=self.student_57.user)
+
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["sources"], [])
+        self.assertIn("Student", data["answer"])
+        # If Gemini had been called, last_question would have been set.
+        self.assertIsNone(_FakeGeminiGenerationService.last_question)
+
+    @patch("ai_assistant.orchestrator.GeminiGenerationService", _FakeGeminiGenerationService)
+    def test_casual_thanks_never_reaches_gemini(self):
+        _FakeGeminiGenerationService.last_question = None
+        response = self._post({"question": "thank you"}, user=self.student_57.user)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["answer"], "You're welcome! Let me know if you need anything else.")
+        self.assertIsNone(_FakeGeminiGenerationService.last_question)
+
+    @patch("ai_assistant.orchestrator.GeminiGenerationService", _FailingGeminiGenerationService)
+    def test_greeting_plus_attendance_question_still_reaches_gemini(self):
+        # "hi, how is my attendance?" is NOT purely casual - it must still
+        # route to the attendance domain and reach Gemini normally. Using
+        # the FAILING fake service here proves this: if the casual layer
+        # incorrectly swallowed this question, no exception would surface
+        # and this assertion would catch the missing 503.
+        response = self._post({"question": "hi, how is my attendance?"}, user=self.student_57.user)
+        self.assertEqual(response.status_code, 503)
+
     # ── Authorization ────────────────────────────────────────────────────
 
     @patch("ai_assistant.orchestrator.GeminiGenerationService", _FakeGeminiGenerationService)
