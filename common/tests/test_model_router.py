@@ -41,6 +41,14 @@ def _client_error_403():
     return genai_errors.ClientError(403, {"error": {"code": 403, "status": "PERMISSION_DENIED", "message": "denied"}})
 
 
+def _client_error_404_not_found():
+    # Reproduces the real production case (2026-09-15): a configured model
+    # name that isn't enabled/accessible for the current Gemini API
+    # key/project - not a quota error, but still model-specific, so a
+    # different configured model may still work.
+    return genai_errors.ClientError(404, {"error": {"code": 404, "status": "NOT_FOUND", "message": "model not found"}})
+
+
 class _FakeModels:
     """
     `responses` is a list of either a return value or an Exception
@@ -245,3 +253,106 @@ class GeminiModelRouterTests(SimpleTestCase):
         client = _FakeClient([])
         with self.assertRaises(ValueError):
             GeminiModelRouter(client, [])
+
+
+class GeminiModelRouterNotFoundFallbackTests(SimpleTestCase):
+    """
+    NOT_FOUND (404) is a model-availability error, not a quota error - a
+    model configured in settings can be entirely unavailable for the
+    current Gemini API key/project. Reproduces the real production
+    failure (model=gemini-2.5-flash reason=NOT_FOUND -> 503 to the
+    student) that motivated adding 404/NOT_FOUND to the fallback-eligible
+    set.
+    """
+
+    # (a) Primary model returns NOT_FOUND -> fallback model is attempted.
+    def test_primary_not_found_triggers_fallback_attempt(self):
+        client = _FakeClient([_client_error_404_not_found(), _Response("ok")])
+        router = GeminiModelRouter(client, ["gemini-2.5-flash", "gemini-3.5-flash-lite"])
+
+        router.generate(contents="hi")
+
+        self.assertEqual([c["model"] for c in client.models.calls], ["gemini-2.5-flash", "gemini-3.5-flash-lite"])
+
+    # (b) Primary model returns 429 -> fallback model is attempted.
+    def test_primary_429_triggers_fallback_attempt(self):
+        client = _FakeClient([_client_error_429(), _Response("ok")])
+        router = GeminiModelRouter(client, ["gemini-2.5-flash", "gemini-3.5-flash-lite"])
+
+        router.generate(contents="hi")
+
+        self.assertEqual([c["model"] for c in client.models.calls], ["gemini-2.5-flash", "gemini-3.5-flash-lite"])
+
+    # (c) Primary model returns 503 -> fallback model is attempted.
+    def test_primary_503_triggers_fallback_attempt(self):
+        client = _FakeClient([_server_error_503(), _Response("ok")])
+        router = GeminiModelRouter(client, ["gemini-2.5-flash", "gemini-3.5-flash-lite"])
+
+        router.generate(contents="hi")
+
+        self.assertEqual([c["model"] for c in client.models.calls], ["gemini-2.5-flash", "gemini-3.5-flash-lite"])
+
+    # (d) Primary model returns 400 -> no fallback.
+    def test_primary_400_does_not_fall_back(self):
+        client = _FakeClient([_client_error_400(), _Response("should never be reached")])
+        router = GeminiModelRouter(client, ["gemini-2.5-flash", "gemini-3.5-flash-lite"])
+
+        with self.assertRaises(genai_errors.ClientError):
+            router.generate(contents="hi")
+
+        self.assertEqual(len(client.models.calls), 1)
+
+    # (e) Primary model returns 401/403 -> no fallback.
+    def test_primary_401_does_not_fall_back(self):
+        client = _FakeClient([_client_error_401(), _Response("should never be reached")])
+        router = GeminiModelRouter(client, ["gemini-2.5-flash", "gemini-3.5-flash-lite"])
+
+        with self.assertRaises(genai_errors.ClientError):
+            router.generate(contents="hi")
+
+        self.assertEqual(len(client.models.calls), 1)
+
+    def test_primary_403_does_not_fall_back(self):
+        client = _FakeClient([_client_error_403(), _Response("should never be reached")])
+        router = GeminiModelRouter(client, ["gemini-2.5-flash", "gemini-3.5-flash-lite"])
+
+        with self.assertRaises(genai_errors.ClientError):
+            router.generate(contents="hi")
+
+        self.assertEqual(len(client.models.calls), 1)
+
+    # (f) Primary model NOT_FOUND and fallback succeeds -> final response is successful.
+    def test_not_found_then_fallback_success_returns_final_answer(self):
+        client = _FakeClient([_client_error_404_not_found(), _Response("Answer from the available model.")])
+        router = GeminiModelRouter(client, ["gemini-2.5-flash", "gemini-3.5-flash-lite"])
+
+        response = router.generate(contents="hi")
+
+        self.assertEqual(response.text, "Answer from the available model.")
+
+    # (g) All configured models return NOT_FOUND -> AllModelsExhaustedError.
+    def test_all_models_not_found_raises_all_models_exhausted(self):
+        client = _FakeClient([
+            _client_error_404_not_found(),
+            _client_error_404_not_found(),
+            _client_error_404_not_found(),
+        ])
+        router = GeminiModelRouter(client, ["gemini-2.5-flash", "gemini-3.5-flash-lite", "gemini-3.8-flash"])
+
+        with self.assertRaises(AllModelsExhaustedError):
+            router.generate(contents="hi")
+
+        self.assertEqual(len(client.models.calls), 3)
+
+    def test_mixed_not_found_and_quota_errors_still_reach_working_model(self):
+        client = _FakeClient([
+            _client_error_404_not_found(),
+            _client_error_429(),
+            _Response("ok"),
+        ])
+        router = GeminiModelRouter(client, ["gemini-2.5-flash", "gemini-3.5-flash-lite", "gemini-3.8-flash"])
+
+        response = router.generate(contents="hi")
+
+        self.assertEqual(response.text, "ok")
+        self.assertEqual(len(client.models.calls), 3)

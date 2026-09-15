@@ -15,17 +15,21 @@ Not used for the Gemini EMBEDDING model (ai_assistant.services
 .gemini_embedding_service) - embeddings are a separate, single-model flow
 and are explicitly out of scope for this router.
 
-Fallback is ONLY for errors that mean "this model can't serve the request
-right now" - HTTP 429 (RESOURCE_EXHAUSTED) and 503 (UNAVAILABLE) service
-errors from the Gemini API. Anything else (invalid request, auth/permission
-errors, a bug in how the caller built the request) is a real application
-error - a different model will not fix it, so it is raised immediately
-without trying further models. When the installed google-genai SDK
-exposes typed exceptions (google.genai.errors.APIError and its
-ClientError/ServerError subclasses), those are used instead of string
-matching; if that import ever becomes unavailable, this module falls back
-to duck-typing the SDK's own `code`/`status` attributes rather than
-failing to import.
+Fallback is ONLY for errors that mean "this model can't serve THIS request
+right now, but a different configured model might" - covering both
+quota/service-availability failures (429 RESOURCE_EXHAUSTED, 503
+UNAVAILABLE) and model-availability failures for the current API
+key/project (404 NOT_FOUND - e.g. a configured model name that isn't
+enabled/accessible for this Gemini project, confirmed in production on
+2026-09-15: gemini-2.5-flash returned NOT_FOUND, not a quota error).
+Anything else (invalid request, auth/permission errors, a bug in how the
+caller built the request) is a real application error - a different model
+will not fix it, so it is raised immediately without trying further
+models. When the installed google-genai SDK exposes typed exceptions
+(google.genai.errors.APIError and its ClientError/ServerError subclasses),
+those are used instead of string matching; if that import ever becomes
+unavailable, this module falls back to duck-typing the SDK's own
+`code`/`status` attributes rather than failing to import.
 """
 import logging
 
@@ -36,11 +40,13 @@ try:
 except ImportError:  # pragma: no cover - google-genai is a hard dependency of this project
     genai_errors = None
 
-# HTTP status codes that indicate the current model is temporarily
-# unavailable (quota/rate-limit or transient service outage), not that the
-# request itself is invalid.
-_TRANSIENT_STATUS_CODES = {429, 503}
-_TRANSIENT_STATUS_NAMES = {"RESOURCE_EXHAUSTED", "UNAVAILABLE"}
+# HTTP status codes/names that indicate the CURRENT model can't serve this
+# request but a different model might: quota/rate-limit (429
+# RESOURCE_EXHAUSTED), transient service outage (503 UNAVAILABLE), and
+# model-not-available-for-this-project/key (404 NOT_FOUND). None of these
+# indicate the request itself is malformed.
+_FALLBACK_ELIGIBLE_STATUS_CODES = {404, 429, 503}
+_FALLBACK_ELIGIBLE_STATUS_NAMES = {"NOT_FOUND", "RESOURCE_EXHAUSTED", "UNAVAILABLE"}
 
 
 class AllModelsExhaustedError(Exception):
@@ -65,14 +71,14 @@ def _is_transient_error(exc):
     if genai_errors is not None and isinstance(exc, genai_errors.APIError):
         code = getattr(exc, "code", None)
         status = getattr(exc, "status", None)
-        return code in _TRANSIENT_STATUS_CODES or status in _TRANSIENT_STATUS_NAMES
+        return code in _FALLBACK_ELIGIBLE_STATUS_CODES or status in _FALLBACK_ELIGIBLE_STATUS_NAMES
 
     # Duck-typed fallback for environments where the typed exception
     # import above is unavailable - still attribute-based, not string
     # matching against exception messages.
     code = getattr(exc, "code", None)
     status = getattr(exc, "status", None)
-    return code in _TRANSIENT_STATUS_CODES or status in _TRANSIENT_STATUS_NAMES
+    return code in _FALLBACK_ELIGIBLE_STATUS_CODES or status in _FALLBACK_ELIGIBLE_STATUS_NAMES
 
 
 def _error_reason(exc):
