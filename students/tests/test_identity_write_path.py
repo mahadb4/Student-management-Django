@@ -94,3 +94,74 @@ class StudentIdentityWritePathTests(TestCase):
         self.assertEqual(student.department_id, self.department.id)
         self.assertEqual(student.section_id, self.section.id)
         self.assertTrue(student.is_active)
+
+    #End-to-end of the actual business flow: the student's onboarding
+    #submission (self.student, created in setUp with self.department/
+    #self.section) is only a starting request - an admin reviewing it can
+    #override to a different Department/Section entirely via the same
+    #admin-only update path, and that becomes the final assignment.
+    def test_admin_can_override_the_students_submitted_department_and_section(self):
+        other_department = Department.objects.create(name = "Electrical", code = "EE")
+        other_section = Section.objects.create(
+            name = "B", department = other_department, semester_number = 1, academic_year = 2026,
+        )
+
+        data = self._base_data(department = other_department.id, section = other_section.id)
+        self.service.update(self.student.id, data)
+
+        student = Student.objects.get(id = self.student.id)
+        self.assertEqual(student.department_id, other_department.id)
+        self.assertEqual(student.section_id, other_section.id)
+
+    #The admin's atomic "Approve Academic Placement" action - Department,
+    #Section and placement_confirmed all land in one PATCH.
+    def test_admin_can_confirm_academic_placement_with_department_and_section(self):
+        unplaced = Student.objects.create(
+            user = User.objects.create_user(
+                email = "unplaced@example.com", name = "Unplaced Student", password = "x", role = "student",
+            ),
+            parents_phone_number = "1234567",
+        )
+        self.assertFalse(unplaced.placement_confirmed)
+
+        data = self._base_data(
+            student_email = "unplaced@example.com",
+            department = self.department.id, section = self.section.id, placement_confirmed = True,
+        )
+        self.service.update(unplaced.id, data)
+
+        unplaced.refresh_from_db()
+        self.assertTrue(unplaced.placement_confirmed)
+        self.assertEqual(unplaced.department_id, self.department.id)
+        self.assertEqual(unplaced.section_id, self.section.id)
+
+    def test_placement_cannot_be_confirmed_without_department_and_section(self):
+        unplaced = Student.objects.create(
+            user = User.objects.create_user(
+                email = "unplaced2@example.com", name = "Unplaced Student", password = "x", role = "student",
+            ),
+            parents_phone_number = "1234567",
+        )
+
+        data = self._base_data(
+            student_email = "unplaced2@example.com",
+            department = None, section = None, placement_confirmed = True,
+        )
+        with self.assertRaises(ValueError):
+            self.service.update(unplaced.id, data)
+
+        unplaced.refresh_from_db()
+        self.assertFalse(unplaced.placement_confirmed)
+
+    def test_section_must_belong_to_the_given_department(self):
+        other_department = Department.objects.create(name = "Electrical", code = "EE")
+        mismatched_section = Section.objects.create(
+            name = "B", department = other_department, semester_number = 1, academic_year = 2026,
+        )
+
+        data = self._base_data(department = self.department.id, section = mismatched_section.id)
+        with self.assertRaises(ValueError):
+            self.service.update(self.student.id, data)
+
+        self.student.refresh_from_db()
+        self.assertEqual(self.student.section_id, self.section.id)

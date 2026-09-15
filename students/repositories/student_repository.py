@@ -20,14 +20,14 @@ class StudentRepository(BaseRepository):
             id = object_id, is_deleted = False,
         )
 
-    def get_queryset_for_list(self, search = None, department_id = None):
+    def get_queryset_for_list(self, search = None, department_id = None, placement_confirmed = None):
         #No .order_by() here - final ordering is applied by the service, after
         #apply_data_scope(), via common.utils.apply_ordering() (see ORDERING_FIELDS
         #above). Search/filtering stays here, unchanged.
         queryset = self.model.objects.select_related(
             "department", "section", "user").only(
 
-            "id", "is_active",
+            "id", "is_active", "placement_confirmed",
             "user_id", "user__name", "user__email", "user__date_of_birth",
             "user__gender", "user__address", "user__profile_picture_key",
             "department__id", "department__name",
@@ -44,6 +44,12 @@ class StudentRepository(BaseRepository):
 
         if department_id is not None:
             queryset = queryset.filter(department_id = department_id)
+
+        # Lets the Admin Students page filter down to just the students
+        # awaiting academic review, reusing this same list endpoint instead
+        # of a separate "pending review" API.
+        if placement_confirmed is not None:
+            queryset = queryset.filter(placement_confirmed = placement_confirmed)
 
         return queryset
 
@@ -94,3 +100,9 @@ class StudentRepository(BaseRepository):
         student.section_id = data.get("section")
         student.is_active = data.get(
             "is_active", True) in (True, "on", "true", "True")
+        # Defaults False on a fresh (onboarding) create, same as every other
+        # field here - update() always goes through
+        # StudentService._merge_data() first, which resolves this to the
+        # student's current value unless the caller explicitly changed it.
+        student.placement_confirmed = data.get(
+            "placement_confirmed", False) in (True, "on", "true", "True")

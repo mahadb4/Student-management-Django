@@ -114,9 +114,13 @@ class AskApiTests(TestCase):
 
         def make_student(email, name):
             user = User.objects.create_user(email=email, name=name, password="x", role="student")
+            # placement_confirmed=True: these tests exercise /ai-assistant/ask/
+            # as an already-active student, not the onboarding/academic-review
+            # flow - authenticate_request() 403s an unconfirmed student before
+            # any of this endpoint's own logic runs.
             return Student.objects.create(
                 user=user, parents_phone_number="1234567",
-                department=self.department, section=self.section,
+                department=self.department, section=self.section, placement_confirmed=True,
             )
 
         self.teacher_a = make_teacher("teacher.a@example.com", "Teacher A", "EMP-A")
@@ -349,7 +353,8 @@ class AskApiTests(TestCase):
         # proves no Gemini call happens, using the real service class.
         new_user = User.objects.create_user(email="lonely@example.com", name="Lonely", password="x", role="student")
         lonely_student = Student.objects.create(
-            user=new_user, parents_phone_number="1234567", department=self.department, section=self.section,
+            user=new_user, parents_phone_number="1234567",
+            department=self.department, section=self.section, placement_confirmed=True,
         )
         response = self._post({"question": "What are my weaknesses?"}, user=lonely_student.user)
         data = response.json()
@@ -646,7 +651,8 @@ class CourseScopedNarrowingApiTests(TestCase):
 
         student_user = User.objects.create_user(email="multi.s@example.com", name="Multi Student", password="x", role="student")
         self.student = Student.objects.create(
-            user=student_user, parents_phone_number="1234567", department=self.department, section=self.section,
+            user=student_user, parents_phone_number="1234567",
+            department=self.department, section=self.section, placement_confirmed=True,
         )
 
         self.databases_course = Course.objects.create(

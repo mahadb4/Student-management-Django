@@ -21,6 +21,22 @@ def authenticate_request(request):
         return None, JsonResponse({"error": Messages.AUTH_CREDENTIALS_NOT_PROVIDED}, status = 401)
 
     user, _ = result
+
+    # Every "me" endpoint that authenticates through this shared helper
+    # (students/attendance/enrollments/assignments/ai_assistant/teachers) is
+    # normal student-portal data - none of it should be reachable until an
+    # admin has confirmed the student's academic placement (Department +
+    # Section). This is the server-side half of that gate: the frontend
+    # route guard keeps a pending student on the "Application Under Review"
+    # page, but a crafted direct API call must be rejected here regardless.
+    # /users/me/ and /users/onboarding/ authenticate independently of this
+    # helper and deliberately stay reachable so the review page can still
+    # show identity and poll for the admin's decision.
+    if user.role == "student":
+        student = _get_profile(user, "student_profile")
+        if student and not student.placement_confirmed:
+            return None, JsonResponse({"error": Messages.ACADEMIC_PLACEMENT_PENDING}, status = 403)
+
     return user, None
 
 

@@ -38,7 +38,7 @@ class StudentIdentityReadPathTests(TestCase):
         self.assertEqual(dto["student_email"], "student@example.com")
         self.assertEqual(
             set(dto.keys()),
-            {"id", "name", "student_email", "department_name", "section_name", "profile_picture_key"},
+            {"id", "name", "student_email", "department_name", "section_name", "placement_confirmed", "profile_picture_key"},
         )
 
     def test_student_name_sorting_uses_user_name(self):

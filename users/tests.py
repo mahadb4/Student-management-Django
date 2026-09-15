@@ -45,6 +45,43 @@ class OnboardingIdentityWritePathTests(TestCase):
         self.assertEqual(student.user_id, user.id)
         self.assertEqual(User.objects.filter(email__iexact = "onboard@example.com").count(), 1)
 
+    #Department/Section are academic placement, decided AFTER onboarding by
+    #an admin (see StudentValidator.validate() for the server-side rule that
+    #placement_confirmed can only ever become True there) - a student must
+    #never be able to set them for themself during onboarding, even by
+    #crafting them into the request body. A freshly onboarded student is
+    #therefore always unplaced and unconfirmed until an admin acts.
+    def test_student_onboarding_ignores_crafted_department_and_section(self):
+        user = User.objects.create_user(
+            email = "crafted@example.com", name = "Crafted Name", password = "x", role = "student",
+        )
+
+        student = _create_own_profile(user, {
+            "first_name": "Crafted", "last_name": "Student",
+            "parents_phone_number": "1234567", "date_of_birth": date(2000, 1, 1), "gender": "M",
+            "department": self.department.id, "section": self.section.id, "placement_confirmed": True,
+        })
+
+        student.refresh_from_db()
+        self.assertIsNone(student.department_id)
+        self.assertIsNone(student.section_id)
+        self.assertFalse(student.placement_confirmed)
+
+    def test_student_onboarding_works_without_department_or_section(self):
+        user = User.objects.create_user(
+            email = "nodept@example.com", name = "No Dept", password = "x", role = "student",
+        )
+
+        student = _create_own_profile(user, {
+            "first_name": "No", "last_name": "Dept",
+            "parents_phone_number": "1234567", "date_of_birth": date(2000, 1, 1), "gender": "M",
+        })
+
+        student.refresh_from_db()
+        self.assertIsNone(student.department_id)
+        self.assertIsNone(student.section_id)
+        self.assertEqual(student.user_id, user.id)
+
     def test_teacher_onboarding_creates_and_links_to_the_registered_user(self):
         user = User.objects.create_user(
             email = "onboardteacher@example.com", name = "Registered Name", password = "x", role = "teacher",

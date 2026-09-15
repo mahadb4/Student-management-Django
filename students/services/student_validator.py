@@ -22,6 +22,21 @@ class StudentValidator:
         if section_id and not Section.objects.filter(id = section_id, is_deleted = False, is_active = True).exists():
             raise ValueError(Messages.INVALID_SECTION.format(section_id))
 
+        # A crafted request could pass a real Section id alongside an
+        # unrelated Department id - the server, not the (already
+        # Department-dependent) dropdown, is what must actually enforce that
+        # the two belong together.
+        if department_id and section_id and not Section.objects.filter(
+            id = section_id, department_id = department_id, is_deleted = False, is_active = True,
+        ).exists():
+            raise ValueError(Messages.SECTION_NOT_IN_DEPARTMENT.format(section_id, department_id))
+
+        # Confirming academic placement (granting the student dashboard
+        # access) is only valid once both halves of the assignment exist -
+        # never partially, and never without an explicit admin action.
+        if data.get("placement_confirmed") and not (department_id and section_id):
+            raise ValueError(Messages.PLACEMENT_REQUIRES_DEPARTMENT_AND_SECTION)
+
     def validate_age(self, date_of_birth):
         if isinstance(date_of_birth, str):
             date_of_birth = date.fromisoformat(date_of_birth)

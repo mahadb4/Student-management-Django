@@ -32,6 +32,7 @@ def serialize_student(student):
         "address": student.user.address,
         "department": student.department_id,
         "section": student.section_id,
+        "placement_confirmed": student.placement_confirmed,
         "date_of_enrollment": str(student.date_of_enrollment),
         "is_active": student.is_active,
         "profile_picture_url": student_service.get_profile_picture_view_url(student.id, s3_service),
@@ -64,12 +65,21 @@ def student_api(request, student_id = None):
                     department_id = int(department_id)
                 except ValueError:
                     department_id = None
+
+            #"" -> None so an omitted param means "no filter" (both values
+            #shown), matching every other optional list filter here.
+            placement_confirmed = request.GET.get("placement_confirmed", "").strip() or None
+            if placement_confirmed is not None:
+                placement_confirmed = placement_confirmed.lower() == "true"
+
             #Normalize paging/ordering first so the cache key reflects the effective
             #values, not the raw query string. Scope filtering, ordering, pagination
             #and DTO mapping all happen inside the service, behind the Redis list cache.
             page_number, page_size = resolve_pagination_params(request)
             ordering = resolve_ordering_param(request, ORDERING_FIELDS, DEFAULT_ORDERING)
-            payload = student_service.get_list(request.user, search, page_number, page_size, department_id, ordering)
+            payload = student_service.get_list(
+                request.user, search, page_number, page_size, department_id, ordering, placement_confirmed,
+            )
             payload["results"] = attach_profile_picture_urls(payload["results"], s3_service)
             return JsonResponse(payload)
 
@@ -196,6 +206,32 @@ def my_profile_api(request):
 
     except ValueError as e:
         return JsonResponse({"error": str(e)}, status = 400)
+
+
+@csrf_exempt
+def my_identity_api(request):
+    # Navbar-only projection of serialize_student_profile() above: the shared
+    # DashboardLayout shell fetches this on every student-facing page (not
+    # just /student/profile) purely to seed the avatar/name, so it must stay
+    # far lighter than the full profile - parents_phone_number/date_of_birth/
+    # gender/address/etc. are never rendered by the navbar and would be
+    # wasted on every page load.
+    if request.method != "GET":
+        return JsonResponse({"error": Messages.METHOD_NOT_ALLOWED}, status = 405)
+
+    from common.permissions import authenticate_request
+    user, error = authenticate_request(request)
+    if error:
+        return error
+
+    student = getattr(user, "student_profile", None)
+    if not student:
+        return JsonResponse({"error": Messages.STUDENT_NOT_FOUND}, status = 404)
+
+    return JsonResponse({
+        "name": f"{student.effective_first_name} {student.effective_last_name}",
+        "profile_picture_url": student_service.get_profile_picture_view_url(student.id, s3_service),
+    })
 
 
 def my_summary_api(request):

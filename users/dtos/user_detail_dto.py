@@ -1,5 +1,5 @@
 class UserDetailDTO:
-    def __init__(self, id, name, email, role, status, permissions, student_id, teacher_id):
+    def __init__(self, id, name, email, role, status, permissions, student_id, teacher_id, academic_review_pending):
         self.id = id
         self.name = name
         self.email = email
@@ -8,6 +8,11 @@ class UserDetailDTO:
         self.permissions = permissions
         self.student_id = student_id
         self.teacher_id = teacher_id
+        # Student-only: True once onboarding has created the Student record
+        # but an admin hasn't yet confirmed Department/Section. Drives the
+        # frontend's redirect to the "Application Under Review" page instead
+        # of the dashboard - never a raw status string, just this one flag.
+        self.academic_review_pending = academic_review_pending
 
     def to_dict(self):
         return {
@@ -19,4 +24,5 @@ class UserDetailDTO:
             "permissions": self.permissions,
             "student_id": self.student_id,
             "teacher_id": self.teacher_id,
+            "academic_review_pending": self.academic_review_pending,
         }
