@@ -10,6 +10,7 @@ class StudentMapper:
             student_email = student.effective_email,
             department_name = student.department.name if student.department_id else None,
             section_name = student.section.name if student.section_id else None,
+            placement_confirmed = student.placement_confirmed,
             profile_picture_key = student.user.profile_picture_key,
         ).to_dict()
 

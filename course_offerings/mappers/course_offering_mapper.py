@@ -2,6 +2,7 @@ from course_offerings.dtos.course_offering_list_dto import CourseOfferingListDTO
 from course_offerings.dtos.course_offering_reference_dto import CourseOfferingReferenceDTO
 from course_offerings.dtos.course_offering_teacher_list_dto import CourseOfferingTeacherListDTO
 from course_offerings.dtos.course_offering_attendance_list_dto import CourseOfferingAttendanceListDTO
+from course_offerings.dtos.course_offering_dashboard_list_dto import CourseOfferingDashboardListDTO
 
 
 class CourseOfferingMapper:
@@ -91,4 +92,24 @@ class CourseOfferingMapper:
             id = offering.id,
             course_name = course_name,
             section_name = section_name,
+        ).to_dict()
+
+    # Used only by the Teacher Dashboard's "My Classes" table
+    # (/teachers/me/courses/?view=dashboard) - that table renders course
+    # name/code/section/student-count/status but never semester/
+    # academic_year (those are only shown on the full My Classes page,
+    # Courses.tsx, which keeps using to_teacher_list_dto unchanged).
+    @staticmethod
+    def to_dashboard_list_dto(offering):
+        course_name = offering.course.name if offering.course_id else None
+        course_code = offering.course.code if offering.course_id else None
+        section_name = offering.section.name if offering.section_id else None
+
+        return CourseOfferingDashboardListDTO(
+            id = offering.id,
+            course_name = course_name,
+            course_code = course_code,
+            section_name = section_name,
+            is_active = offering.is_active,
+            enrolled_students_count = offering.enrolled_students_count,
         ).to_dict()

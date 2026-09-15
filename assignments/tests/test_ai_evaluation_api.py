@@ -76,7 +76,8 @@ class AiEvaluationApiTests(TestCase):
             user = User.objects.create_user(email=email, name=name, password="x", role="student")
             UserRepository().approve(user)
             return Student.objects.create(
-                user=user, parents_phone_number="1234567", department=self.department, section=self.section,
+                user=user, parents_phone_number="1234567",
+                department=self.department, section=self.section, placement_confirmed=True,
             )
 
         self.teacher_a = make_teacher("teacher.a@example.com", "Teacher A", "EMP-A")
@@ -285,7 +286,8 @@ class EvaluationReviewApiTests(TestCase):
         student_user = User.objects.create_user(email="s@example.com", name="Student", password="x", role="student")
         UserRepository().approve(student_user)
         self.student = Student.objects.create(
-            user=student_user, parents_phone_number="1234567", department=self.department, section=self.section,
+            user=student_user, parents_phone_number="1234567",
+            department=self.department, section=self.section, placement_confirmed=True,
         )
 
         self.course = Course.objects.create(

@@ -34,4 +34,5 @@ class UserMapper:
             permissions = [],
             student_id = student.id if student else None,
             teacher_id = teacher.id if teacher else None,
+            academic_review_pending = bool(student) and not student.placement_confirmed,
         ).to_dict()

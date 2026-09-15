@@ -22,6 +22,15 @@ class Student(models.Model):
     
     date_of_enrollment = models.DateField(auto_now_add = True)
 
+    # False until an admin explicitly confirms the student's academic
+    # placement (Department + Section assigned) - this, not department/
+    # section being non-null, is what gates dashboard access. True only ever
+    # comes from an explicit admin action (see StudentValidator.validate(),
+    # which refuses True unless both are set), whether that student was
+    # created via self-service onboarding or the admin's own direct
+    # "Add Student" flow.
+    placement_confirmed = models.BooleanField(default = False)
+
     is_active = models.BooleanField(default = True)
     is_deleted = models.BooleanField(default = False)
     created_at = models.DateTimeField(auto_now_add = True)

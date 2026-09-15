@@ -174,13 +174,15 @@ def my_course_offerings_api(request):
     if not teacher:
         return JsonResponse({"error": Messages.TEACHER_NOT_FOUND}, status = 404)
 
-    # Opt-in narrower projection for the Attendance register (?view=attendance) -
-    # every other caller (the My Classes page) keeps the fuller default shape.
-    mapper_func = (
-        CourseOfferingMapper.to_attendance_list_dto
-        if request.GET.get("view") == "attendance"
-        else CourseOfferingMapper.to_teacher_list_dto
-    )
+    # Opt-in narrower projections for specific consumers - every other caller
+    # (the full My Classes page) keeps the fuller default shape.
+    view = request.GET.get("view")
+    if view == "attendance":
+        mapper_func = CourseOfferingMapper.to_attendance_list_dto
+    elif view == "dashboard":
+        mapper_func = CourseOfferingMapper.to_dashboard_list_dto
+    else:
+        mapper_func = CourseOfferingMapper.to_teacher_list_dto
 
     qs = course_offering_repository.get_queryset_for_teacher_list(teacher.id)
     return paginate_queryset(request, qs, mapper_func, default_page_size = 10)

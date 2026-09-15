@@ -85,6 +85,7 @@ class Messages:
     FORBIDDEN = "Forbidden."
     AUTHENTICATION_REQUIRED = "Authentication required."
     AUTH_CREDENTIALS_NOT_PROVIDED = "Authentication credentials were not provided."
+    ACADEMIC_PLACEMENT_PENDING = "Your academic placement is still under review. This will be available once an administrator confirms your Department and Section."
     INVALID_OR_EXPIRED_TOKEN = "Invalid or expired token."
     PERMISSION_DENIED = "Permission denied: {} required."
     ADMIN_ACCESS_REQUIRED = "Admin access required."
@@ -121,6 +122,8 @@ class Messages:
     INVALID_SEMESTER = "Invalid semester '{}'."
     INVALID_SEMESTER_NUMBER = "Invalid semester number '{}'. Must be between 1 and 8."
     INVALID_SECTION = "Invalid section with ID {}."
+    SECTION_NOT_IN_DEPARTMENT = "Section with ID {} does not belong to department with ID {}."
+    PLACEMENT_REQUIRES_DEPARTMENT_AND_SECTION = "A student's academic placement cannot be confirmed without both a Department and a Section assigned."
 
     # ── Validation — Uniqueness ───────────────────────────────────────────────
     EMPLOYEE_ID_EXISTS = "Employee ID '{}' already exists."

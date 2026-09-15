@@ -31,11 +31,28 @@ student_service = StudentService(StudentValidator(), StudentRepository(), Studen
 teacher_service = TeacherService(TeacherValidator(), TeacherRepository(), TeacherCache(CacheService()))
 
 
+#Fields a student can never set for themself during onboarding, including by
+#crafting the request body - Department/Section are admin-assigned academic
+#placement, decided AFTER onboarding via the admin-only PATCH
+#/students/<id>/ path (see StudentValidator.validate() for the server-side
+#rule that placement_confirmed can only ever become True there, and only
+#once both are set). A brand-new Student is therefore always created with
+#department/section null and placement_confirmed False regardless of what
+#the student submits - that's what puts them into academic review instead
+#of the dashboard (see complete_onboarding_api's response and
+#App.tsx's ProtectedRoute on the frontend).
+STUDENT_ONBOARDING_BLOCKED_FIELDS = ("department", "section", "placement_confirmed")
+
+
 def _create_own_profile(user, profile):
     # Email/role come from the authenticated User, not the payload, so a
     # user can only create a profile for themself.
     if user.role == "student":
-        return student_service.create({**profile, "student_email": user.email}, user = user)
+        student_profile = {
+            key: value for key, value in profile.items()
+            if key not in STUDENT_ONBOARDING_BLOCKED_FIELDS
+        }
+        return student_service.create({**student_profile, "student_email": user.email}, user = user)
     if user.role == "teacher":
         return teacher_service.create({**profile, "email": user.email}, user = user)
     return None

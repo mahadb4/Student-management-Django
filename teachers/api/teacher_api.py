@@ -196,6 +196,31 @@ def my_profile_api(request):
         return JsonResponse({"error": str(e)}, status = 400)
 
 
+@csrf_exempt
+def my_identity_api(request):
+    # Navbar-only projection of serialize_teacher_profile() above: the shared
+    # DashboardLayout shell fetches this on every teacher-facing page (not
+    # just /teacher/profile) purely to seed the avatar/name, so it must stay
+    # far lighter than the full profile - employee_id/email/phone_number/etc.
+    # are never rendered by the navbar and would be wasted on every page load.
+    if request.method != "GET":
+        return JsonResponse({"error": Messages.METHOD_NOT_ALLOWED}, status = 405)
+
+    from common.permissions import authenticate_request
+    user, error = authenticate_request(request)
+    if error:
+        return error
+
+    teacher = getattr(user, "teacher_profile", None)
+    if not teacher:
+        return JsonResponse({"error": Messages.TEACHER_NOT_FOUND}, status = 404)
+
+    return JsonResponse({
+        "name": f"{teacher.effective_first_name} {teacher.effective_last_name}",
+        "profile_picture_url": teacher_service.get_profile_picture_view_url(teacher.id, s3_service),
+    })
+
+
 def my_students_api(request):
     # Returns one row per enrollment (student only - no course/section fields,
     # since the frontend always calls this with a single ?course_offering_id=

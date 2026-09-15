@@ -1,6 +1,6 @@
 from django.urls import path
 from .student_api import (
-    student_api, my_profile_api, my_summary_api, student_reference_api,
+    student_api, my_profile_api, my_identity_api, my_summary_api, student_reference_api,
     my_profile_picture_upload_url_api, my_profile_picture_confirm_api, my_profile_picture_api,
     student_profile_picture_api,
 )
@@ -9,6 +9,7 @@ from attendance.api.attendance_api import my_student_attendance_api
 
 urlpatterns = [
     path("students/me/", my_profile_api, name = "student_my_profile_api"),
+    path("students/me/identity/", my_identity_api, name = "student_my_identity_api"),
     path("students/me/summary/", my_summary_api, name = "student_my_summary_api"),
     path("students/me/courses/reference/", my_enrollments_reference_api, name = "student_my_courses_reference_api"),
     path("students/me/courses/", my_enrollments_api, name = "student_my_courses_api"),

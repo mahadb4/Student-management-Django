@@ -26,12 +26,14 @@ class StudentService:
     #resolve_ordering_param) so equivalent requests share one cache entry.
     #The cached value is the finished payload, built AFTER scope filtering, ordering and pagination,
     #and DTO mapping, so a cache hit skips the database entirely.
-    def get_list(self,user,search,page,page_size,department_id=None,ordering=None):
+    def get_list(self,user,search,page,page_size,department_id=None,ordering=None,placement_confirmed=None):
         scope_token = self.cache.scope_token_for(user)
-        filters = {"department_id": department_id, "ordering": ordering}
+        filters = {"department_id": department_id, "ordering": ordering, "placement_confirmed": placement_confirmed}
 
         def loader():
-            queryset = self.repository.get_queryset_for_list(search = search, department_id = department_id)
+            queryset = self.repository.get_queryset_for_list(
+                search = search, department_id = department_id, placement_confirmed = placement_confirmed,
+            )
             queryset = apply_data_scope(user,queryset,'student')
             queryset = apply_ordering(queryset,ordering,ORDERING_FIELDS)
             return build_paginated_payload(queryset,page,page_size,StudentMapper.to_list_dto)
@@ -172,4 +174,5 @@ class StudentService:
             "department":data.get("department",student.department_id),
             "section":data.get("section",student.section_id),
             "is_active":data.get("is_active",student.is_active),
+            "placement_confirmed":data.get("placement_confirmed",student.placement_confirmed),
         }
