@@ -30,6 +30,7 @@ their results. If no domain is relevant to the question, none is queried
 and Gemini is never called - a fallback/clarification message is returned
 directly.
 """
+from ai_assistant.casual_intent import build_casual_response, classify_casual_intent
 from ai_assistant.context.assignment_context import build_assignment_context
 from ai_assistant.context.attendance_context import build_attendance_context
 from ai_assistant.context.course_context import build_course_context
@@ -68,6 +69,15 @@ def _course_not_found_message(phrase):
 
 
 def answer_academic_question(user, question, *, embedding_service=None, generation_service=None):
+    # Checked BEFORE the academic router/course resolution/retrieval/Gemini
+    # - a purely casual message ("hi", "thanks", "bye"...) never reaches
+    # any of those. Only a FULL match short-circuits here; "hi, how is my
+    # attendance?" does not fully match a casual pattern, so it falls
+    # through to the router exactly as before. See ai_assistant.casual_intent.
+    casual_intent = classify_casual_intent(question)
+    if casual_intent is not None:
+        return {"answer": build_casual_response(casual_intent, user), "sources": []}
+
     domains = route(question)
     overall = _is_overall_question(question)
     course_match = resolve_mentioned_course(user, question)

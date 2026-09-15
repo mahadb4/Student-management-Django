@@ -530,3 +530,111 @@ class OrchestratorTests(SimpleTestCase):
 
         mock_gen_cls.return_value.generate_answer.assert_called_once()
         self.assertEqual(result["answer"], "Focus on SQL.")
+
+
+class OrchestratorCasualIntentTests(SimpleTestCase):
+    """
+    The casual layer (ai_assistant.casual_intent) is checked FIRST, before
+    routing/course resolution/retrieval/Gemini - these tests prove that
+    short-circuit actually happens at the orchestrator level, and that it
+    does NOT fire for a message that merely contains a greeting word
+    alongside real academic content.
+    """
+
+    def setUp(self):
+        self.user = AnonymousUser()
+
+    @patch("ai_assistant.orchestrator.route")
+    @patch("ai_assistant.orchestrator.resolve_mentioned_course")
+    @patch("ai_assistant.orchestrator.GeminiGenerationService")
+    @patch("ai_assistant.orchestrator.get_semantically_relevant_remarks")
+    def test_casual_greeting_short_circuits_before_router_and_gemini(
+        self, mock_retrieve, mock_gen_cls, mock_resolve_course, mock_route,
+    ):
+        result = answer_academic_question(self.user, "hello")
+
+        mock_route.assert_not_called()
+        mock_resolve_course.assert_not_called()
+        mock_retrieve.assert_not_called()
+        mock_gen_cls.assert_not_called()
+        self.assertEqual(result["sources"], [])
+        self.assertTrue(result["answer"].startswith("Hi!"))
+
+    @patch("ai_assistant.orchestrator.route")
+    @patch("ai_assistant.orchestrator.GeminiGenerationService")
+    def test_thanks_short_circuits_before_gemini(self, mock_gen_cls, mock_route):
+        result = answer_academic_question(self.user, "thank you")
+
+        mock_route.assert_not_called()
+        mock_gen_cls.assert_not_called()
+        self.assertEqual(result, {"answer": "You're welcome! Let me know if you need anything else.", "sources": []})
+
+    @patch("ai_assistant.orchestrator.route")
+    @patch("ai_assistant.orchestrator.GeminiGenerationService")
+    def test_goodbye_short_circuits_before_gemini(self, mock_gen_cls, mock_route):
+        result = answer_academic_question(self.user, "bye")
+
+        mock_route.assert_not_called()
+        mock_gen_cls.assert_not_called()
+        self.assertTrue(result["answer"].startswith("See you later"))
+
+    # ── Ambiguous cases: greeting word + real academic content must still route normally ──
+
+    @patch("ai_assistant.orchestrator.build_attendance_context")
+    @patch("ai_assistant.orchestrator.GeminiGenerationService")
+    @patch("ai_assistant.orchestrator.build_remark_context")
+    @patch("ai_assistant.orchestrator.get_semantically_relevant_remarks")
+    def test_hi_plus_attendance_question_still_reaches_attendance_domain(
+        self, mock_retrieve, mock_build_remark_ctx, mock_gen_cls, mock_build_attendance_ctx,
+    ):
+        mock_build_attendance_ctx.return_value = {
+            "prompt_item": {"teacher_name": "Attendance Summary", "course_name": "Overall", "created_at": "", "text": "..."},
+            "sources": [{"type": "attendance", "course_name": "Maths", "detail": "90%"}],
+        }
+        mock_gen_cls.return_value.generate_answer.return_value = "Your attendance is 90%."
+
+        result = answer_academic_question(self.user, "hi, how is my attendance?")
+
+        mock_build_attendance_ctx.assert_called_once_with(self.user, course_offering_id=None)
+        self.assertEqual(result["answer"], "Your attendance is 90%.")
+
+    @patch("ai_assistant.orchestrator.build_course_context")
+    @patch("ai_assistant.orchestrator.build_attendance_context")
+    @patch("ai_assistant.orchestrator.GeminiGenerationService")
+    @patch("ai_assistant.orchestrator.build_remark_context")
+    @patch("ai_assistant.orchestrator.get_semantically_relevant_remarks")
+    def test_hey_plus_assignments_question_still_reaches_assignments_domain(
+        self, mock_retrieve, mock_build_remark_ctx, mock_gen_cls, mock_build_attendance_ctx, mock_build_course_ctx,
+    ):
+        with patch("ai_assistant.orchestrator.build_assignment_context") as mock_build_assignment_ctx:
+            mock_build_assignment_ctx.return_value = {
+                "prompt_item": {"teacher_name": "Assignments Summary", "course_name": "Overall", "created_at": "", "text": "..."},
+                "sources": [{"type": "assignment", "title": "HW1", "course_name": "Maths",
+                              "due_at": "2026-01-01", "status": "pending", "attachment_available": False}],
+            }
+            mock_gen_cls.return_value.generate_answer.return_value = "You have 1 pending assignment."
+
+            result = answer_academic_question(self.user, "hey, what assignments do I have?")
+
+            mock_build_assignment_ctx.assert_called_once_with(self.user, course_offering_id=None)
+        self.assertEqual(result["answer"], "You have 1 pending assignment.")
+
+    @patch("ai_assistant.orchestrator.build_attendance_context")
+    @patch("ai_assistant.orchestrator.GeminiGenerationService")
+    @patch("ai_assistant.orchestrator.build_remark_context")
+    @patch("ai_assistant.orchestrator.get_semantically_relevant_remarks")
+    def test_hello_plus_courses_question_still_reaches_courses_domain(
+        self, mock_retrieve, mock_build_remark_ctx, mock_gen_cls, mock_build_attendance_ctx,
+    ):
+        with patch("ai_assistant.orchestrator.build_course_context") as mock_build_course_ctx:
+            mock_build_course_ctx.return_value = {
+                "prompt_item": {"teacher_name": "Courses Summary", "course_name": "Overall", "created_at": "", "text": "..."},
+                "sources": [{"type": "course", "course_name": "Databases", "course_code": "CS201",
+                              "teacher_name": "Dr. Smith", "section_name": "A"}],
+            }
+            mock_gen_cls.return_value.generate_answer.return_value = "Dr. Smith teaches you Databases."
+
+            result = answer_academic_question(self.user, "hello, who teaches me?")
+
+            mock_build_course_ctx.assert_called_once_with(self.user, course_offering_id=None)
+        self.assertEqual(result["answer"], "Dr. Smith teaches you Databases.")
