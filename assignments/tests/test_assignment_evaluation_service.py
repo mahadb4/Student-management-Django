@@ -10,8 +10,10 @@ google-genai SDK behaves when response_schema is a Pydantic model
 see the Phase 11B verification).
 """
 from django.test import SimpleTestCase
+from google.genai import errors as genai_errors
 
 from assignments.services.assignment_evaluation_service import (
+    EVALUATION_MODEL,
     SYSTEM_INSTRUCTION,
     AssignmentEvaluationError,
     AssignmentEvaluationInput,
@@ -185,3 +187,71 @@ class AssignmentEvaluationResultValidationTests(SimpleTestCase):
             AssignmentEvaluationResult(
                 suggested_score=50, strengths=[], weaknesses=[], feedback="", confidence="very-high",
             )
+
+
+class AssignmentEvaluationServiceFallbackTests(SimpleTestCase):
+    """
+    The model router itself is unit-tested in common/tests/test_model_router.py.
+    These tests only prove AssignmentEvaluationService wires an explicit
+    model_chain into its router, and that a fallback still produces the
+    same public contract (a parsed AssignmentEvaluationResult).
+    """
+
+    def _multi_model_client(self, responses):
+        class _Models:
+            def __init__(self, responses):
+                self._responses = list(responses)
+                self.calls = []
+
+            def generate_content(self, **kwargs):
+                self.calls.append(kwargs)
+                result = self._responses.pop(0)
+                if isinstance(result, Exception):
+                    raise result
+                return result
+
+        class _Client:
+            def __init__(self, responses):
+                self.models = _Models(responses)
+
+        return _Client(responses)
+
+    def _quota_error(self):
+        return genai_errors.ClientError(429, {"error": {"code": 429, "status": "RESOURCE_EXHAUSTED", "message": "quota"}})
+
+    def _input(self):
+        return AssignmentEvaluationInput(
+            assignment_title="FOP #1",
+            assignment_description="Build a Django REST API.",
+            submission_pdf_bytes=b"%PDF-1.4 fake bytes",
+        )
+
+    def test_falls_back_to_second_model_on_quota_error(self):
+        client = self._multi_model_client([self._quota_error(), _FakeResponse(SAMPLE_RESULT)])
+        service = AssignmentEvaluationService(client=client, model_chain=["gemini-2.5-flash", "gemini-3.5-flash-lite"])
+
+        result = service.evaluate(self._input())
+
+        self.assertIs(result, SAMPLE_RESULT)
+        self.assertEqual([c["model"] for c in client.models.calls], ["gemini-2.5-flash", "gemini-3.5-flash-lite"])
+
+    def test_all_models_exhausted_raises_assignment_evaluation_error(self):
+        client = self._multi_model_client([self._quota_error(), self._quota_error()])
+        service = AssignmentEvaluationService(client=client, model_chain=["gemini-2.5-flash", "gemini-3.5-flash-lite"])
+
+        with self.assertRaises(AssignmentEvaluationError):
+            service.evaluate(self._input())
+
+    def test_default_chain_starts_with_evaluation_model_constant(self):
+        service = AssignmentEvaluationService(client=_FakeClient(parsed=SAMPLE_RESULT))
+        self.assertEqual(service.model_chain[0], EVALUATION_MODEL)
+
+    def test_non_transient_error_on_primary_does_not_try_fallback(self):
+        bad_request = genai_errors.ClientError(400, {"error": {"code": 400, "status": "INVALID_ARGUMENT", "message": "bad"}})
+        client = self._multi_model_client([bad_request, _FakeResponse(SAMPLE_RESULT)])
+        service = AssignmentEvaluationService(client=client, model_chain=["gemini-2.5-flash", "gemini-3.5-flash-lite"])
+
+        with self.assertRaises(AssignmentEvaluationError):
+            service.evaluate(self._input())
+
+        self.assertEqual(len(client.models.calls), 1)

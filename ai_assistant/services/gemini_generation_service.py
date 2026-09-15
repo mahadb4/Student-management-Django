@@ -2,6 +2,8 @@ from django.conf import settings
 from google import genai
 from google.genai import types
 
+from common.ai.model_router import AllModelsExhaustedError, GeminiModelRouter, build_model_chain
+
 # gemini-2.5-flash: stable, generally-available Gemini text generation
 # model. Originally implemented with gemini-3.8-flash (also GA per docs,
 # confirmed valid via client.models.get() - "models/gemini-3.8-flash"),
@@ -15,6 +17,14 @@ from google.genai import types
 # to an explicit version rather than an alias like "gemini-flash-latest"
 # so this service's behavior doesn't silently change under a future
 # release - revisit this pin if gemini-3.8-flash's demand issues resolve.
+#
+# This remains the code-level default primary model (and the value the
+# gemini-3.8-flash regression test below still pins against). The actual
+# primary/fallback chain used at request time is resolved from
+# settings.GEMINI_PRIMARY_MODEL / GEMINI_FALLBACK_MODELS (see
+# common.ai.model_router) - when those settings are left at their
+# defaults, the chain starts with this exact model, so behavior is
+# unchanged unless a fallback chain is explicitly configured.
 GENERATION_MODEL = "gemini-2.5-flash"
 
 # No tokenizer is used anywhere in this project (see Phase 6's context
@@ -105,8 +115,18 @@ class GeminiGenerationService:
     retrieval results. There is nothing for this service to re-check.
     """
 
-    def __init__(self, client=None):
+    def __init__(self, client=None, model_chain=None):
         self.client = client or genai.Client(api_key=settings.GEMINI_API_KEY)
+        # Resolved at construction time (not at module import) so it
+        # reflects current settings - primary/fallback come from
+        # settings.GEMINI_PRIMARY_MODEL / GEMINI_FALLBACK_MODELS, falling
+        # back to this module's own historically-pinned GENERATION_MODEL
+        # if those settings are unset.
+        self.model_chain = model_chain or build_model_chain(
+            getattr(settings, "GEMINI_PRIMARY_MODEL", None) or GENERATION_MODEL,
+            getattr(settings, "GEMINI_FALLBACK_MODELS", ""),
+        )
+        self.router = GeminiModelRouter(self.client, self.model_chain)
 
     def generate_answer(self, question, context):
         """
@@ -139,14 +159,18 @@ class GeminiGenerationService:
         prompt = _build_user_prompt(question, items)
 
         try:
-            response = self.client.models.generate_content(
-                model=GENERATION_MODEL,
+            response = self.router.generate(
                 contents=prompt,
                 config=types.GenerateContentConfig(
                     system_instruction=SYSTEM_INSTRUCTION,
                     temperature=GENERATION_TEMPERATURE,
                 ),
             )
+        except AllModelsExhaustedError as e:
+            # Same student-facing failure mode as before (AnswerGenerationError,
+            # translated by the API layer into a generic "unavailable" 503) -
+            # the student is never told which/how many models were tried.
+            raise AnswerGenerationError("Gemini generation is temporarily unavailable.") from e
         except Exception as e:
             raise AnswerGenerationError(f"Gemini generation request failed: {type(e).__name__}") from e
 

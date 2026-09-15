@@ -11,6 +11,25 @@ AWS_STORAGE_BUCKET_NAME = config("AWS_STORAGE_BUCKET_NAME")
 AWS_S3_REGION_NAME = config("AWS_S3_REGION_NAME")
 GEMINI_API_KEY = config("GEMINI_API_KEY")
 
+# Model fallback chain for the Student AI Assistant's grounded Q&A
+# generation (ai_assistant.services.gemini_generation_service). Not used
+# for the Gemini embedding model, which remains a fixed single model.
+# GEMINI_FALLBACK_MODELS is a comma-separated list, tried in order only
+# after GEMINI_PRIMARY_MODEL fails with a transient (quota/availability)
+# error - see common.ai.model_router. Left empty by default: an unset/
+# empty value means "no fallback configured", not "misconfiguration".
+GEMINI_PRIMARY_MODEL = config("GEMINI_PRIMARY_MODEL", default="gemini-2.5-flash")
+GEMINI_FALLBACK_MODELS = config("GEMINI_FALLBACK_MODELS", default="")
+
+# Separate chain for AI Assignment Evaluation (assignments.services
+# .assignment_evaluation_service), which requires PDF/multimodal input and
+# structured (Pydantic) JSON output - NOT every text-generation model
+# supports that, so this must never simply reuse GEMINI_FALLBACK_MODELS.
+# Only add a model here once you've confirmed it supports PDF input,
+# multimodal generation, and response_schema-based structured output.
+GEMINI_ASSIGNMENT_PRIMARY_MODEL = config("GEMINI_ASSIGNMENT_PRIMARY_MODEL", default="gemini-2.5-flash")
+GEMINI_ASSIGNMENT_FALLBACK_MODELS = config("GEMINI_ASSIGNMENT_FALLBACK_MODELS", default="")
+
 DEBUG = True
 
 ALLOWED_HOSTS = ["localhost", "127.0.0.1"]
