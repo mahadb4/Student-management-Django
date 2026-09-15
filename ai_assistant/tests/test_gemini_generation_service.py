@@ -7,6 +7,7 @@ Tests check behavior and contracts (what was sent, what came back, what
 happens on failure/empty context) - never exact wording from a real model.
 """
 from django.test import SimpleTestCase
+from google.genai import errors as genai_errors
 
 from ai_assistant.services.gemini_generation_service import (
     GENERATION_MODEL,
@@ -264,3 +265,82 @@ class GeminiGenerationServiceTests(SimpleTestCase):
         client = _FakeClient()
         service = GeminiGenerationService(client=client)
         self.assertIs(service.client, client)
+
+
+class GeminiGenerationServiceFallbackTests(SimpleTestCase):
+    """
+    The model router (common.ai.model_router) is unit-tested on its own in
+    common/tests/test_model_router.py - these tests only prove
+    GeminiGenerationService actually wires an explicit model_chain into
+    its router and that a fallback success still produces the same public
+    contract (a plain answer string, no model name anywhere in it).
+    """
+
+    def _multi_model_client(self, responses):
+        class _Models:
+            def __init__(self, responses):
+                self._responses = list(responses)
+                self.calls = []
+
+            def generate_content(self, **kwargs):
+                self.calls.append(kwargs)
+                result = self._responses.pop(0)
+                if isinstance(result, Exception):
+                    raise result
+                return result
+
+        class _Client:
+            def __init__(self, responses):
+                self.models = _Models(responses)
+
+        return _Client(responses)
+
+    def _quota_error(self):
+        return genai_errors.ClientError(429, {"error": {"code": 429, "status": "RESOURCE_EXHAUSTED", "message": "quota"}})
+
+    def test_falls_back_to_second_model_on_quota_error(self):
+        client = self._multi_model_client([self._quota_error(), _FakeResponse("Answer from fallback model.")])
+        service = GeminiGenerationService(client=client, model_chain=["gemini-2.5-flash", "gemini-3.5-flash-lite"])
+
+        answer = service.generate_answer("How am I doing?", CONTEXT_WITH_ITEMS)
+
+        self.assertEqual(answer, "Answer from fallback model.")
+        self.assertEqual([c["model"] for c in client.models.calls], ["gemini-2.5-flash", "gemini-3.5-flash-lite"])
+
+    def test_answer_never_reveals_which_model_was_used(self):
+        client = self._multi_model_client([self._quota_error(), _FakeResponse("Plain grounded answer text.")])
+        service = GeminiGenerationService(client=client, model_chain=["gemini-2.5-flash", "gemini-3.5-flash-lite"])
+
+        answer = service.generate_answer("How am I doing?", CONTEXT_WITH_ITEMS)
+
+        self.assertNotIn("gemini", answer.lower())
+        self.assertNotIn("model", answer.lower())
+
+    def test_all_models_exhausted_raises_answer_generation_error_without_model_names(self):
+        client = self._multi_model_client([self._quota_error(), self._quota_error()])
+        service = GeminiGenerationService(client=client, model_chain=["gemini-2.5-flash", "gemini-3.5-flash-lite"])
+
+        try:
+            service.generate_answer("How am I doing?", CONTEXT_WITH_ITEMS)
+            self.fail("expected AnswerGenerationError")
+        except AnswerGenerationError as e:
+            self.assertNotIn("gemini-2.5-flash", str(e))
+            self.assertNotIn("gemini-3.5-flash-lite", str(e))
+
+    def test_default_chain_starts_with_generation_model_constant(self):
+        # No explicit model_chain given, and no fallback configured in
+        # settings by default - the router's chain must still start with
+        # the historically-pinned GENERATION_MODEL, so existing/default
+        # deployments see no behavior change.
+        service = GeminiGenerationService(client=_FakeClient())
+        self.assertEqual(service.model_chain[0], GENERATION_MODEL)
+
+    def test_non_transient_error_on_primary_does_not_try_fallback(self):
+        bad_request = genai_errors.ClientError(400, {"error": {"code": 400, "status": "INVALID_ARGUMENT", "message": "bad"}})
+        client = self._multi_model_client([bad_request, _FakeResponse("should never be reached")])
+        service = GeminiGenerationService(client=client, model_chain=["gemini-2.5-flash", "gemini-3.5-flash-lite"])
+
+        with self.assertRaises(AnswerGenerationError):
+            service.generate_answer("How am I doing?", CONTEXT_WITH_ITEMS)
+
+        self.assertEqual(len(client.models.calls), 1)

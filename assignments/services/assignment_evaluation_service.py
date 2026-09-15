@@ -29,11 +29,22 @@ from google import genai
 from google.genai import types
 from pydantic import BaseModel, Field
 
+from common.ai.model_router import AllModelsExhaustedError, GeminiModelRouter, build_model_chain
+
 # Same pinned model as the Student Assistant (Phase 7) - already verified
 # stable/GA and free of the gemini-3.8-flash demand issues. Using the same
 # model for both AI capabilities is a reasonable shared choice; nothing
 # about this service depends on GeminiGenerationService itself, so the two
 # remain otherwise fully independent AI products.
+#
+# Code-level default primary model, used when settings.GEMINI_ASSIGNMENT_
+# PRIMARY_MODEL is unset. The fallback chain is deliberately SEPARATE from
+# the Student Assistant's (settings.GEMINI_FALLBACK_MODELS) - this service
+# sends a PDF Part and requires structured (Pydantic) JSON output, which
+# not every text-generation model supports, so its own
+# GEMINI_ASSIGNMENT_FALLBACK_MODELS setting must only ever list models
+# already confirmed to support PDF input, multimodal generation, and
+# response_schema-based structured output.
 EVALUATION_MODEL = "gemini-2.5-flash"
 
 EVALUATION_TEMPERATURE = 0.2
@@ -114,15 +125,19 @@ class AssignmentEvaluationService:
     pattern is intentional; sharing the class or prompt is not.
     """
 
-    def __init__(self, client=None):
+    def __init__(self, client=None, model_chain=None):
         self.client = client or genai.Client(api_key=settings.GEMINI_API_KEY)
+        self.model_chain = model_chain or build_model_chain(
+            getattr(settings, "GEMINI_ASSIGNMENT_PRIMARY_MODEL", None) or EVALUATION_MODEL,
+            getattr(settings, "GEMINI_ASSIGNMENT_FALLBACK_MODELS", ""),
+        )
+        self.router = GeminiModelRouter(self.client, self.model_chain)
 
     def evaluate(self, evaluation_input: AssignmentEvaluationInput) -> AssignmentEvaluationResult:
         contents = _build_user_content(evaluation_input)
 
         try:
-            response = self.client.models.generate_content(
-                model=EVALUATION_MODEL,
+            response = self.router.generate(
                 contents=contents,
                 config=types.GenerateContentConfig(
                     system_instruction=SYSTEM_INSTRUCTION,
@@ -131,6 +146,8 @@ class AssignmentEvaluationService:
                     response_schema=AssignmentEvaluationResult,
                 ),
             )
+        except AllModelsExhaustedError as e:
+            raise AssignmentEvaluationError("Gemini evaluation is temporarily unavailable.") from e
         except Exception as e:
             raise AssignmentEvaluationError(f"Gemini evaluation request failed: {type(e).__name__}") from e
 
