@@ -1,8 +1,21 @@
 from users.dtos.user_list_dto import UserListDTO
 from users.dtos.user_detail_dto import UserDetailDTO
+from users.dtos.user_identity_dto import UserIdentityDTO
 
 
 class UserMapper:
+    # Used at login only: token issuance needs no profile-linkage or
+    # permissions detail, just enough to identify the account and route it.
+    @staticmethod
+    def to_identity_dto(user):
+        return UserIdentityDTO(
+            id = user.id,
+            name = user.name,
+            email = user.email,
+            role = user.role,
+            status = user.status,
+        ).to_dict()
+
     # Used by the Admin-facing /users/ and /users/pending/ lists - callers
     # only need enough to identify and act on a row (approve/reject/view),
     # not the full permissions/profile-linkage detail.
@@ -16,10 +29,10 @@ class UserMapper:
             status = user.status,
         ).to_dict()
 
-    # Used wherever the caller needs the full identity: single-user GET,
-    # register/login/approve/reject responses, and the authenticated
-    # /me/ and onboarding endpoints (which also need student_id/teacher_id
-    # to know whether a profile is already linked).
+    # Used wherever the caller needs the full detail: single-user GET,
+    # register/approve/reject responses, and the authenticated /me/ and
+    # onboarding endpoints (which also need student_id/teacher_id to know
+    # whether a profile is already linked). Login uses to_identity_dto instead.
     @staticmethod
     def to_detail_dto(user):
         student = getattr(user, "student_profile", None)
@@ -31,7 +44,6 @@ class UserMapper:
             email = user.email,
             role = user.role,
             status = user.status,
-            permissions = [],
             student_id = student.id if student else None,
             teacher_id = teacher.id if teacher else None,
             academic_review_pending = bool(student) and not student.placement_confirmed,

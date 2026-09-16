@@ -3,6 +3,8 @@ from course_offerings.dtos.course_offering_reference_dto import CourseOfferingRe
 from course_offerings.dtos.course_offering_teacher_list_dto import CourseOfferingTeacherListDTO
 from course_offerings.dtos.course_offering_attendance_list_dto import CourseOfferingAttendanceListDTO
 from course_offerings.dtos.course_offering_dashboard_list_dto import CourseOfferingDashboardListDTO
+from course_offerings.dtos.course_offering_class_assignment_dto import CourseOfferingClassAssignmentDTO
+from course_offerings.dtos.course_offering_attendance_reference_dto import CourseOfferingAttendanceReferenceDTO
 
 
 class CourseOfferingMapper:
@@ -52,6 +54,47 @@ class CourseOfferingMapper:
             course_name = course_name,
             course_code = course_code,
             teacher_name = teacher_name,
+            section_name = section_name,
+        ).to_dict()
+
+    # Used only by the Admin Student Edit form's Course Offering picker - that
+    # dropdown already knows the section (fixed by the form's own Section
+    # field) and never shows semester/academic_year/is_active, so this drops
+    # them entirely instead of reusing to_list_dto's fuller shape (which
+    # CourseOfferings.tsx and Enrollments.tsx still need unchanged).
+    @staticmethod
+    def to_class_assignment_dto(offering):
+        course_name = offering.course.name if offering.course_id else None
+        course_code = offering.course.code if offering.course_id else None
+
+        teacher_name = (
+            f"{offering.teacher.effective_first_name} {offering.teacher.effective_last_name}"
+            if offering.teacher_id else None
+        )
+
+        section_name = offering.section.name if offering.section_id else None
+
+        return CourseOfferingClassAssignmentDTO(
+            id = offering.id,
+            course_name = course_name,
+            course_code = course_code,
+            teacher_name = teacher_name,
+            section_name = section_name,
+        ).to_dict()
+
+    # Used only by the Admin Attendance page's Course/Section picker - Department
+    # and Teacher are already picked in earlier steps of that same form, so this
+    # drops semester/academic_year/is_active/course_name/teacher_name entirely
+    # instead of reusing to_reference_dto's fuller shape (which student Courses.tsx
+    # still needs unchanged).
+    @staticmethod
+    def to_attendance_reference_dto(offering):
+        course_code = offering.course.code if offering.course_id else None
+        section_name = offering.section.name if offering.section_id else None
+
+        return CourseOfferingAttendanceReferenceDTO(
+            id = offering.id,
+            course_code = course_code,
             section_name = section_name,
         ).to_dict()
 

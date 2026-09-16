@@ -1,11 +1,10 @@
 class UserDetailDTO:
-    def __init__(self, id, name, email, role, status, permissions, student_id, teacher_id, academic_review_pending):
+    def __init__(self, id, name, email, role, status, student_id, teacher_id, academic_review_pending):
         self.id = id
         self.name = name
         self.email = email
         self.role = role
         self.status = status
-        self.permissions = permissions
         self.student_id = student_id
         self.teacher_id = teacher_id
         # Student-only: True once onboarding has created the Student record
@@ -21,7 +20,6 @@ class UserDetailDTO:
             "email": self.email,
             "role": self.role,
             "status": self.status,
-            "permissions": self.permissions,
             "student_id": self.student_id,
             "teacher_id": self.teacher_id,
             "academic_review_pending": self.academic_review_pending,

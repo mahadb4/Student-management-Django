@@ -146,7 +146,7 @@ def login_api(request):
 
         result = user_service.login(data)
 
-        user_payload = UserMapper.to_detail_dto(result["user"])
+        user_payload = UserMapper.to_identity_dto(result["user"])
         user_payload["name"] = resolve_authenticated_display_name(result["user"])
 
         return JsonResponse(

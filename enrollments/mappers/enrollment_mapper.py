@@ -3,6 +3,7 @@ from enrollments.dtos.student_enrollment_list_dto import StudentEnrollmentListDT
 from enrollments.dtos.enrollment_reference_dto import EnrollmentReferenceDTO
 from enrollments.dtos.enrollment_teacher_list_dto import EnrollmentTeacherListDTO
 from enrollments.dtos.enrollment_attendance_roster_dto import EnrollmentAttendanceRosterDTO
+from enrollments.dtos.enrollment_attendance_picker_dto import EnrollmentAttendancePickerDTO
 
 
 class EnrollmentMapper:
@@ -23,6 +24,20 @@ class EnrollmentMapper:
             course_name = enrollment.course_offering.course.name,
             course_code = enrollment.course_offering.course.code,
             section_name = section_name,
+        ).to_dict()
+
+    # Used only by the Admin Attendance page's Add/Edit modal Student picker
+    # (/enrollments/?course_offering_id=&view=attendance) - that modal already
+    # scopes to one course offering, so this drops status/semester/
+    # academic_year/course_name/section_name/student_email entirely instead of
+    # reusing to_list_dto's fuller shape (which Enrollments.tsx still needs
+    # unchanged).
+    @staticmethod
+    def to_attendance_picker_dto(enrollment):
+        return EnrollmentAttendancePickerDTO(
+            id = enrollment.id,
+            student_name = f"{enrollment.student.effective_first_name} {enrollment.student.effective_last_name}",
+            course_code = enrollment.course_offering.course.code,
         ).to_dict()
 
     # Used only by the authenticated Student's own /students/me/courses/ -
