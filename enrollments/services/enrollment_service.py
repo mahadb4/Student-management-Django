@@ -20,15 +20,18 @@ class EnrollmentService:
     #GET /api/enrollments/?page=&page_size=&search=
     #Scoped per user: admin sees all, a teacher those in their own offerings,
     #a student their own.
-    def get_list(self,user,search,page,page_size,ordering=None,course_offering_id=None):
+    #view is an opt-in narrower projection (same pattern as course_offerings'
+    #get_list view=) - absent -> unfiltered, unchanged for every other caller.
+    def get_list(self,user,search,page,page_size,ordering=None,course_offering_id=None,view=None):
         scope_token = self.cache.scope_token_for(user)
-        filters = {"ordering": ordering, "course_offering_id": course_offering_id}
+        filters = {"ordering": ordering, "course_offering_id": course_offering_id, "view": view}
+        mapper_func = EnrollmentMapper.to_attendance_picker_dto if view == "attendance" else EnrollmentMapper.to_list_dto
 
         def loader():
             queryset = self.repository.get_queryset_for_list(search = search, course_offering_id = course_offering_id)
             queryset = apply_data_scope(user,queryset,'enrollment')
             queryset = apply_ordering(queryset,ordering,ORDERING_FIELDS)
-            return build_paginated_payload(queryset,page,page_size,EnrollmentMapper.to_list_dto)
+            return build_paginated_payload(queryset,page,page_size,mapper_func)
 
         return self.cache.get_or_load_list(scope_token,search,page,page_size,loader,filters=filters)
 

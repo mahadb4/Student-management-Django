@@ -54,12 +54,15 @@ def enrollment_api(request, enrollment_id = None):
             #Optional: scopes the Admin Attendance Add/Edit modal's enrollment
             #picker to one course offering (see EnrollmentRepository.get_queryset_for_list).
             course_offering_id = request.GET.get("course_offering_id", "").strip() or None
+            #Opt-in narrower projection for that same Attendance modal - absent
+            #-> unfiltered (existing behavior unchanged) for Enrollments.tsx.
+            view = request.GET.get("view", "").strip() or None
             #Normalize paging/ordering before they reach the cache key. Scope
             #filtering, ordering, pagination and DTO mapping happen inside the service.
             page_number, page_size = resolve_pagination_params(request)
             ordering = resolve_ordering_param(request, ORDERING_FIELDS, DEFAULT_ORDERING)
             return JsonResponse(
-                enrollment_service.get_list(request.user, search, page_number, page_size, ordering, course_offering_id)
+                enrollment_service.get_list(request.user, search, page_number, page_size, ordering, course_offering_id, view)
             )
 
         if request.method == "POST":

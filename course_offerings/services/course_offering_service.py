@@ -20,15 +20,19 @@ class CourseOfferingService:
     #GET /api/course_offerings/?page=&page_size=&search=&section_id=
     #Scoped per user: admin sees all, a teacher their own, a student those they
     #are enrolled in.
-    def get_list(self,user,search,section_id,page,page_size,active_only=False,ordering=None):
+    #view is an opt-in narrower projection for specific consumers (same pattern
+    #as my_course_offerings_api's view= param) - every other caller leaves it
+    #unset and keeps the fuller to_list_dto shape.
+    def get_list(self,user,search,section_id,page,page_size,active_only=False,ordering=None,view=None):
         scope_token = self.cache.scope_token_for(user)
-        filters = {"section_id": section_id, "active_only": active_only, "ordering": ordering}
+        filters = {"section_id": section_id, "active_only": active_only, "ordering": ordering, "view": view}
+        mapper_func = CourseOfferingMapper.to_class_assignment_dto if view == "class_assignment" else CourseOfferingMapper.to_list_dto
 
         def loader():
             queryset = self.repository.get_queryset_for_list(search = search, section_id = section_id, active_only = active_only)
             queryset = apply_data_scope(user,queryset,'courseoffering')
             queryset = apply_ordering(queryset,ordering,ORDERING_FIELDS)
-            return build_paginated_payload(queryset,page,page_size,CourseOfferingMapper.to_list_dto)
+            return build_paginated_payload(queryset,page,page_size,mapper_func)
 
         return self.cache.get_or_load_list(
             scope_token,search,page,page_size,loader,filters = filters,
@@ -43,16 +47,19 @@ class CourseOfferingService:
     #    enrollment_service._validate_student_section. Enrolment itself is still
     #    authorised by that validator on POST; this only widens what is visible
     #    to browse, never what may be enrolled in.
-    def get_reference_list(self,user,search,page,page_size,teacher_id=None):
+    #view is an opt-in narrower projection (same pattern as get_list's view=) -
+    #absent -> unfiltered, unchanged for every other caller of this endpoint.
+    def get_reference_list(self,user,search,page,page_size,teacher_id=None,view=None):
         scope_token = self.cache.reference_scope_token_for(user)
+        mapper_func = CourseOfferingMapper.to_attendance_reference_dto if view == "attendance" else CourseOfferingMapper.to_reference_dto
 
         def loader():
             queryset = self._reference_queryset(user,search,teacher_id)
-            return build_paginated_payload(queryset,page,page_size,CourseOfferingMapper.to_reference_dto)
+            return build_paginated_payload(queryset,page,page_size,mapper_func)
 
         payload = self.cache.get_or_load_list(
             scope_token,search,page,page_size,loader,
-            filters = {**self.cache.REFERENCE_FILTERS, "teacher_id": teacher_id},
+            filters = {**self.cache.REFERENCE_FILTERS, "teacher_id": teacher_id, "view": view},
         )
 
         return self._exclude_already_enrolled(user,payload)

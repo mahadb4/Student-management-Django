@@ -65,13 +65,18 @@ def course_offering_api(request, offering_id = None):
             # CourseOfferings management table still needs inactive rows.
             active_only = request.GET.get("active_only", "").strip().lower() == "true"
 
+            # Opt-in narrower projection for the Admin Student Edit form's
+            # Course Offering picker - absent -> unfiltered (existing behavior
+            # unchanged) for CourseOfferings.tsx and Enrollments.tsx.
+            view = request.GET.get("view", "").strip() or None
+
             #Normalize paging/ordering before they reach the cache key. Scope
             #filtering, ordering, pagination and DTO mapping happen inside the service.
             page_number, page_size = resolve_pagination_params(request)
             ordering = resolve_ordering_param(request, ORDERING_FIELDS, DEFAULT_ORDERING)
             return JsonResponse(
                 course_offering_service.get_list(
-                    request.user, search, section_id, page_number, page_size, active_only, ordering,
+                    request.user, search, section_id, page_number, page_size, active_only, ordering, view,
                 )
             )
 
@@ -145,6 +150,11 @@ def course_offering_reference_api(request):
     teacher_id_param = request.GET.get("teacher_id", "").strip()
     teacher_id = int(teacher_id_param) if teacher_id_param.isdigit() else None
 
+    # Opt-in narrower projection for the Admin Attendance page's Course/Section
+    # picker - absent -> unfiltered (existing behavior unchanged) for every
+    # other caller (student Courses.tsx, etc).
+    view = request.GET.get("view", "").strip() or None
+
     # Admins and teachers keep their normal data scope here. Students get
     # section-matched DISCOVERY instead of their enrolment-based scope, which
     # otherwise made the "Available Offerings" tab permanently empty (it returned
@@ -156,7 +166,7 @@ def course_offering_reference_api(request):
 
     return JsonResponse(
         course_offering_service.get_reference_list(
-            request.user, search, page_number, page_size, teacher_id,
+            request.user, search, page_number, page_size, teacher_id, view,
         )
     )
 
