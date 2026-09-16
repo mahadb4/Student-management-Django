@@ -20,14 +20,8 @@ s3_service = S3Service()
 from common.utils import attach_profile_picture_urls, build_paginated_payload, paginate_queryset, resolve_ordering_param, resolve_pagination_params
 
 def serialize_teacher_profile(teacher):
-    # The Profile page renders the name as one string ("Muhammad Owais"), never
-    # first/last separately, so this profile-only DTO returns it pre-joined -
-    # unlike serialize_teacher() below (Admin's CRUD), which keeps them split
-    # since Admin's edit form needs them as separate inputs.
-    # phone_number/date_of_birth/gender/address/qualification are included so
-    # the Profile page's own edit form (PATCH /teachers/me/, TEACHER_SELF_EDITABLE_FIELDS
-    # below) can pre-fill with current values - salary/is_active/timestamps stay excluded
-    # since they're admin-only and never shown here.
+    # Profile page renders name as one joined string, unlike serialize_teacher()
+    # below (Admin CRUD) which keeps first/last split for its edit form.
     return {
         "id": teacher.id,
         "name": f"{teacher.effective_first_name} {teacher.effective_last_name}",
@@ -92,9 +86,6 @@ def teacher_api(request, teacher_id = None):
                     department_id = int(department_id)
                 except ValueError:
                     department_id = None
-            #Normalize paging/ordering first so the cache key reflects the effective
-            #values, not the raw query string. Scope filtering, ordering, pagination
-            #and DTO mapping all happen inside the service, behind the Redis list cache.
             page_number, page_size = resolve_pagination_params(request)
             ordering = resolve_ordering_param(request, ORDERING_FIELDS, DEFAULT_ORDERING)
             payload = teacher_service.get_list(request.user, search, page_number, page_size, department_id, ordering)
@@ -153,10 +144,8 @@ def teacher_reference_api(request):
     return paginate_queryset(request, teachers, TeacherMapper.to_reference_dto, default_page_size = 10)
 
 
-# The only fields a teacher may change about themself, mirroring what they
-# originally supply at onboarding - never employee_id/department/designation/
-# date_of_joining/salary/status, which stay admin-controlled even if a client
-# sends them in the PATCH body.
+# Fields a teacher may self-edit; employee_id/department/designation/salary/
+# status stay admin-controlled even if sent in the PATCH body.
 TEACHER_SELF_EDITABLE_FIELDS = ("phone_number", "date_of_birth", "gender", "address", "qualification")
 
 
@@ -182,9 +171,8 @@ def my_profile_api(request):
         if not isinstance(data, dict):
             raise ValueError(Messages.REQUEST_BODY_MUST_BE_JSON_OBJECT)
 
-        # Whitelist before handing off to the shared update path - resolving
-        # `teacher` from request.user above already guarantees this can only
-        # ever touch the caller's own record.
+        # Whitelist fields; `teacher` resolved from request.user guarantees this
+        # can only ever touch the caller's own record.
         allowed_data = {field: data[field] for field in TEACHER_SELF_EDITABLE_FIELDS if field in data}
         teacher_service.update(teacher.id, allowed_data, partial = True)
         return JsonResponse({"message": Messages.TEACHER_UPDATED})
@@ -198,11 +186,8 @@ def my_profile_api(request):
 
 @csrf_exempt
 def my_identity_api(request):
-    # Navbar-only projection of serialize_teacher_profile() above: the shared
-    # DashboardLayout shell fetches this on every teacher-facing page (not
-    # just /teacher/profile) purely to seed the avatar/name, so it must stay
-    # far lighter than the full profile - employee_id/email/phone_number/etc.
-    # are never rendered by the navbar and would be wasted on every page load.
+    # Navbar-only projection of serialize_teacher_profile(): fetched on every
+    # teacher page just to seed avatar/name, so kept lighter than the full profile.
     if request.method != "GET":
         return JsonResponse({"error": Messages.METHOD_NOT_ALLOWED}, status = 405)
 
@@ -222,10 +207,8 @@ def my_identity_api(request):
 
 
 def my_students_api(request):
-    # Returns one row per enrollment (student only - no course/section fields,
-    # since the frontend always calls this with a single ?course_offering_id=
-    # already, making those fields identical/redundant on every row - see
-    # EnrollmentMapper.to_teacher_list_dto).
+    # One row per enrollment; frontend always scopes by a single
+    # ?course_offering_id=, so course/section fields would be redundant here.
     if request.method != "GET":
         return JsonResponse({"error": Messages.METHOD_NOT_ALLOWED}, status = 405)
 
@@ -239,31 +222,19 @@ def my_students_api(request):
     if error:
         return error
 
-    # Reuses apply_data_scope's existing teacher branch for 'enrollment':
-    # enrollments in this teacher's own course offerings - the same scoping
-    # rule already used by the general /enrollments/ list, just resolved for `me`.
-    # ACTIVE-only: a DROPPED/COMPLETED enrollment is not a student currently
-    # taking the class, so it must never appear in the roster the Attendance
-    # register marks against (this was previously unfiltered here).
+    # ACTIVE-only: a DROPPED/COMPLETED enrollment must never appear in the
+    # roster the Attendance register marks against.
     qs = apply_data_scope(user, EnrollmentRepository().get_queryset_for_list(), 'enrollment').filter(
         status = Enrollment.Status.ACTIVE,
     )
 
-    # Optional: scope down to one class's roster (e.g. for marking attendance,
-    # where every student in the selected class must be selectable, not just
-    # whichever page of the teacher's full cross-class enrollment list happens
-    # to be loaded).
     course_offering_id = request.GET.get("course_offering_id")
     if course_offering_id:
         qs = qs.filter(course_offering_id = course_offering_id)
 
-    # Same alphabetical-by-name ordering Admin's Enrollments list already
-    # applies (ORDERING_FIELDS/DEFAULT_ORDERING = "name", i.e.
-    # student__user__name) - reused here rather than left unsorted.
     qs = apply_ordering(qs, DEFAULT_ORDERING, ORDERING_FIELDS)
 
-    # Opt-in narrower projection for the Attendance register (?view=attendance) -
-    # every other caller (the My Students page) keeps the fuller default shape.
+    # Opt-in narrower projection for the Attendance register (?view=attendance).
     mapper_func = (
         EnrollmentMapper.to_attendance_roster_dto
         if request.GET.get("view") == "attendance"

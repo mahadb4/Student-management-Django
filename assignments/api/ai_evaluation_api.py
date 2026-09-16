@@ -1,10 +1,7 @@
 """
-Phase 11B: AI Assignment Evaluation endpoints.
-
-This is a SEPARATE AI capability from the Student RAG Assistant
-(ai_assistant app) - a teacher-triggered, single-document evaluation, not
-retrieval-augmented generation. See
-assignments.services.assignment_evaluation_service for the actual Gemini
+AI Assignment Evaluation endpoints - a teacher-triggered, single-document
+evaluation, separate from the Student RAG Assistant (ai_assistant app). See
+assignments.services.assignment_evaluation_service for the Gemini
 integration; this module only orchestrates authorization, S3 access, and
 persistence around it - it never imports google.genai directly.
 
