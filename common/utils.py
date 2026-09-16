@@ -5,13 +5,11 @@ from common.constants import PROFILE_PICTURE_CONTENT_TYPES
 from common.messages import Messages
 
 
-#Splits a full name into (first_name, rest).
 def split_display_name(full_name):
     parts = (full_name or "").strip().split(" ", 1)
     return parts[0], (parts[1] if len(parts) > 1 else "")
 
 
-#Joins first_name/last_name into a single display name.
 def build_full_name(first_name, last_name):
     return f"{(first_name or '').strip()} {(last_name or '').strip()}".strip()
 
@@ -21,10 +19,8 @@ def parse_json_request(request):
         if not request.body:
             return {}
 
-        #This converts JSON into Python data
         data = json.loads(request.body)
 
-        #Checks whether the received data is a Python dictionary
         if not isinstance(data, dict):
             raise ValueError(Messages.REQUEST_DATA_MUST_BE_JSON_OBJECT)
 
@@ -34,10 +30,8 @@ def parse_json_request(request):
         raise ValueError(Messages.INVALID_JSON)
 
 
-#Reads ?page= and ?page_size= and normalizes them into safe integers.
-#Extracted so that callers which cache a paginated payload key their cache on the
-#NORMALIZED values ("?page=abc", "?page=-3" and "?page=" must not each create a
-#separate cache entry for what is really page 1).
+# Normalizes ?page=/?page_size= into safe integers so callers that cache a
+# paginated payload key on the normalized values, not the raw query string.
 def resolve_pagination_params(request,
                               default_page_size = 10,
                               max_page_size = 500):
@@ -52,7 +46,6 @@ def resolve_pagination_params(request,
     if page_size < 1:
         page_size = default_page_size
 
-    #min() chooses the smaller value
     page_size = min(page_size, max_page_size)
 
     try:
@@ -66,19 +59,8 @@ def resolve_pagination_params(request,
     return page_number, page_size
 
 
-#Reads ?ordering= and normalizes it into a safe, allowlisted value. Currently only
-#"name"/"-name" sorting is supported anywhere in the project (see each entity
-#repository's ORDERING_FIELDS), so allowed_fields is always a single-key map, but
-#this stays generic in case a second sortable field is ever genuinely needed.
-#
-#Extracted for the same reason as resolve_pagination_params(): callers which cache
-#a paginated payload key their cache on the NORMALIZED value, so an invalid/missing
-#?ordering= always falls back to the same default rather than fragmenting the cache.
-#
-#allowed_fields: dict mapping a public ordering key (no leading "-") to a tuple of
-#real ORM field lookups in ascending order, e.g. {"name": ("first_name","last_name")}.
-#default: the public key to use (ascending) when ?ordering= is missing or not present
-#in allowed_fields. Never raises - an invalid value is treated the same as a missing one.
+# Normalizes ?ordering= against an allowlist (falls back to `default` if missing/
+# invalid) so cached paginated payloads don't fragment on the raw query string.
 def resolve_ordering_param(request, allowed_fields, default):
     raw = request.GET.get("ordering", "").strip()
     key = raw[1:] if raw.startswith("-") else raw
@@ -89,11 +71,8 @@ def resolve_ordering_param(request, allowed_fields, default):
     return default
 
 
-#Applies an ALREADY-normalized ordering value (from resolve_ordering_param) to a
-#queryset, translating the public key to its real ORM field(s) via allowed_fields,
-#and appending "id" as a deterministic secondary sort so rows with an equal primary
-#value still paginate stably - direction-matched to the primary field, e.g.
-#"name" -> id ASC, "-name" -> id DESC.
+# Applies a normalized ordering value, appending "id" as a deterministic
+# secondary sort so rows with an equal primary value still paginate stably.
 def apply_ordering(queryset, ordering, allowed_fields):
     descending = ordering.startswith("-")
     key = ordering[1:] if descending else ordering
@@ -105,9 +84,8 @@ def apply_ordering(queryset, ordering, allowed_fields):
     return queryset.order_by(*fields, "-id" if descending else "id")
 
 
-#Builds the plain paginated payload dict. Takes ALREADY-normalized page/page_size.
-#Kept separate from paginate_queryset() so a service layer can cache the payload
-#before it is turned into a JsonResponse.
+# Kept separate from paginate_queryset() so a service layer can cache the
+# payload before it is turned into a JsonResponse.
 def build_paginated_payload(queryset,
                             page_number,
                             page_size,
@@ -128,7 +106,7 @@ def build_paginated_payload(queryset,
     except PageNotAnInteger:
         page_obj = paginator.page(1)
     except EmptyPage:
-        #Suppose: Total pages = 5 User requests: ?page=100 Instead of an error: Return last page = Page 5
+        # Out-of-range page number falls back to the last page instead of erroring.
         page_obj = paginator.page(paginator.num_pages)
 
     return {
@@ -162,8 +140,7 @@ def extension_for_allowed_content_type(content_type, allowed_types, invalid_mess
     return allowed_types[normalized]
 
 
-#Converts each item's profile_picture_key into a fresh profile_picture_url -
-#called after the cache lookup, so signed URLs never get written to Redis.
+# Called after the cache lookup, so signed S3 URLs never get written to Redis.
 def attach_profile_picture_urls(results, s3_service):
     for item in results:
         key = item.pop("profile_picture_key", None)
@@ -172,14 +149,13 @@ def attach_profile_picture_urls(results, s3_service):
     return results
 
 
-def paginate_queryset(request, #Contains: ?page=2&page_size=10
-                      queryset, #This is the database data to paginate like students.objects.all()
+def paginate_queryset(request,
+                      queryset,
                       serializer_func,
                       default_page_size = 10,
                       max_page_size = 500):
     page_number, page_size = resolve_pagination_params(request, default_page_size, max_page_size)
 
-    #Now the API sends the final result to the frontend
     return JsonResponse(
         build_paginated_payload(queryset, page_number, page_size, serializer_func)
     )
