@@ -1,34 +1,8 @@
 """
-Phase 10B/10C/10D/10E: the Student Academic Assistant orchestrator.
-
-    question
-       |
-       v
-    router.route()               -- which domains are relevant? (NOT authorization)
-    resolve_mentioned_course()   -- did the question name one of the student's
-                                     OWN authorized courses? (NOT authorization -
-                                     search space is already-authorized courses only)
-       |
-       v
-    per-domain context builders  -- each independently authorized, each
-    optionally narrowed to one course_offering_id AFTER its own authorization
-    check, never instead of it:
-       remarks:     remarks.authorization.get_remarks_queryset_for_user (Phase 5)
-       attendance:  common.permissions.apply_data_scope (Phase 10B)
-       assignments: assignments.authorization.get_assignments_queryset_for_user (Phase 10C)
-       courses:     common.permissions.apply_data_scope (Phase 10D)
-       |
-       v
-    combined context -> GeminiGenerationService (Phase 7, unchanged)
-       |
-       v
-    {"answer": str, "sources": [...]}
-
-This module performs no authorization of its own and no database queries
-of its own - it only calls other functions that already do, and combines
-their results. If no domain is relevant to the question, none is queried
-and Gemini is never called - a fallback/clarification message is returned
-directly.
+Student Academic Assistant orchestrator. Routes a question through router.route()
+and resolve_mentioned_course(), then calls each per-domain context builder (each
+independently authorized), and combines their results into a GeminiGenerationService
+answer. Performs no authorization or database queries of its own.
 """
 from ai_assistant.casual_intent import build_casual_response, classify_casual_intent
 from ai_assistant.context.assignment_context import build_assignment_context
@@ -36,6 +10,7 @@ from ai_assistant.context.attendance_context import build_attendance_context
 from ai_assistant.context.course_context import build_course_context
 from ai_assistant.context.remark_context import build_remark_context
 from ai_assistant.course_resolution import resolve_mentioned_course
+from ai_assistant.intent_classifier import Intent, RetrievalStrategy, classify_intent
 from ai_assistant.retrieval.semantic_remarks import get_semantically_relevant_remarks
 from ai_assistant.router import route
 from ai_assistant.services.gemini_generation_service import GeminiGenerationService
@@ -46,9 +21,27 @@ NO_RELEVANT_DOMAIN_MESSAGE = (
 )
 NOT_ENOUGH_INFORMATION_MESSAGE = "There is not enough information available to answer this question."
 
-# Additive layer on top of the existing keyword router (Phase 10B/C/D),
-# not a rewrite of it - when any of these phrases appear, all four domains
-# are activated regardless of which specific domain keywords also matched.
+# Recognized intents the system has no data source for at all, distinct from
+# Intent.UNSUPPORTED (no domain matched, handled via NO_RELEVANT_DOMAIN_MESSAGE).
+_UNSUPPORTED_INTENT_MESSAGES = {
+    Intent.COURSE_RECOMMENDATION: (
+        "I can show you the courses you're currently enrolled in, but I don't have your future semester "
+        "plan, prerequisite structure, or an advisor-approved course roadmap, so I can't reliably recommend "
+        "your next courses from the data available here. Your academic advisor can guide that decision "
+        "using your full degree plan."
+    ),
+}
+_DEFAULT_UNSUPPORTED_CAPABILITY_MESSAGE = (
+    "I don't currently have the information needed to answer that from your academic records. "
+    "I can help with your courses, attendance, assignments, or feedback from your teachers."
+)
+
+
+def _unsupported_capability_message(intent):
+    return _UNSUPPORTED_INTENT_MESSAGES.get(intent, _DEFAULT_UNSUPPORTED_CAPABILITY_MESSAGE)
+
+# When any of these phrases appear, all four domains are activated regardless
+# of which specific domain keywords also matched.
 _OVERALL_KEYWORDS = ("overall", "summary", "how am i doing", "academic progress")
 
 
@@ -69,44 +62,37 @@ def _course_not_found_message(phrase):
 
 
 def answer_academic_question(user, question, *, embedding_service=None, generation_service=None):
-    # Checked BEFORE the academic router/course resolution/retrieval/Gemini
-    # - a purely casual message ("hi", "thanks", "bye"...) never reaches
-    # any of those. Only a FULL match short-circuits here; "hi, how is my
-    # attendance?" does not fully match a casual pattern, so it falls
-    # through to the router exactly as before. See ai_assistant.casual_intent.
+    # Only a full match short-circuits here; see ai_assistant.casual_intent.
     casual_intent = classify_casual_intent(question)
     if casual_intent is not None:
         return {"answer": build_casual_response(casual_intent, user), "sources": []}
 
     domains = route(question)
     overall = _is_overall_question(question)
+
+    # Recognized-but-structurally-unsupported intents are caught before course
+    # resolution/retrieval run, since no data source exists for them.
+    intent_result = classify_intent(question, is_overall=overall)
+    if intent_result.retrieval_strategy is RetrievalStrategy.UNSUPPORTED and intent_result.intent != Intent.UNSUPPORTED:
+        return {"answer": _unsupported_capability_message(intent_result.intent), "sources": []}
+
     course_match = resolve_mentioned_course(user, question)
 
-    # An ambiguous course match is never safe to guess through - stop here,
-    # no retrieval, no Gemini call, regardless of what else was routed.
+    # An ambiguous course match is never safe to guess through.
     if course_match["status"] == "ambiguous":
         return {"answer": _course_ambiguous_message(course_match["candidates"]), "sources": []}
 
-    # Only surface the explicit "no such course" message when no OTHER
-    # domain keyword already routed (a harmless mis-extracted trailing
-    # phrase, e.g. "...in general?", must not hijack an already-answerable
-    # question into a dead end). Deliberately NOT conditioned on `overall`:
-    # a phrase like "How am I doing in Physics?" also happens to contain
-    # the overall-trigger substring "how am i doing", but naming a specific
-    # (unrecognized) course is a MORE specific signal than the generic
-    # overall trigger and must win - otherwise a failed course lookup would
-    # silently fall through to a full, unscoped four-domain answer instead
-    # of telling the student the course wasn't found.
+    # Only surface "no such course" when no other domain keyword already routed,
+    # since naming a specific (unrecognized) course is a more specific signal
+    # than the generic overall trigger and must win.
     if course_match["status"] == "none_but_mentioned" and not any(domains.values()):
         return {"answer": _course_not_found_message(course_match["phrase"]), "sources": []}
 
     if overall:
         domains = {key: True for key in domains}
     elif course_match["status"] == "matched" and not any(domains.values()):
-        # "How am I doing in Database Systems?" carries no domain keyword
-        # of its own - resolving a specific course is itself the signal
-        # that a broad, course-scoped answer (all four domains, narrowed)
-        # is wanted, mirroring the "overall" trigger but for one course.
+        # Resolving a specific course with no domain keyword is itself the
+        # signal that a broad, course-scoped answer is wanted.
         domains = {key: True for key in domains}
 
     if not any(domains.values()):

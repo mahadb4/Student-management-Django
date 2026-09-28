@@ -1,8 +1,5 @@
-# One-off/repeatable backfill: creates a RemarkEmbedding for every Remark
-# that doesn't have one yet (or whose embedded_text has gone stale relative
-# to the current remark_text), via the Gemini embedding API. Safe to re-run -
-# embed_remark() updates the existing RemarkEmbedding in place rather than
-# creating a duplicate, since it's a OneToOneField.
+# Backfill: creates a RemarkEmbedding for every Remark that doesn't have one
+# yet or is stale. Safe to re-run - embed_remark() updates in place.
 from django.core.management.base import BaseCommand
 
 from ai_assistant.services.gemini_embedding_service import EmbeddingGenerationError, GeminiEmbeddingService

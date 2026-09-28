@@ -15,13 +15,8 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        # Ensures the PostgreSQL "vector" extension exists in whichever
-        # database this migration runs against (dev, test, staging, ...),
-        # rather than relying on someone having manually run
-        # CREATE EXTENSION vector beforehand. Requires a DB role with
-        # privilege to create extensions (the project's dev role is a
-        # superuser, so this succeeds locally; a restricted-privilege
-        # production role may need this run separately by a DBA).
+        # Ensures the PostgreSQL "vector" extension exists; requires a DB role
+        # with privilege to create extensions.
         VectorExtension(),
         migrations.CreateModel(
             name="RemarkEmbedding",

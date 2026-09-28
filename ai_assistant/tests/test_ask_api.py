@@ -1,11 +1,7 @@
 """
-Phase 8 tests (updated in Phase 10B/10C/10D): POST /api/ai-assistant/ask/.
-
-No real Gemini API calls anywhere - the embedding service used inside
-Phase 5's retrieval (ai_assistant.retrieval.semantic_remarks) and the
-generation service used by the orchestrator (ai_assistant.orchestrator,
-which the view now delegates to) are both patched at their import sites.
-No test in this file requires a real GEMINI_API_KEY.
+Tests for POST /api/ai-assistant/ask/. No real Gemini API calls anywhere -
+the embedding service used inside semantic retrieval and the generation
+service used by the orchestrator are both patched at their import sites.
 """
 import json
 import math
@@ -68,7 +64,7 @@ class _FakeGeminiEmbeddingService:
         pass
 
     def embed_text(self, text):
-        return _vector(0)  # query vector = angle 0, matching the test fixtures below
+        return _vector(0)
 
 
 class _FakeGeminiGenerationService:
@@ -114,10 +110,8 @@ class AskApiTests(TestCase):
 
         def make_student(email, name):
             user = User.objects.create_user(email=email, name=name, password="x", role="student")
-            # placement_confirmed=True: these tests exercise /ai-assistant/ask/
-            # as an already-active student, not the onboarding/academic-review
-            # flow - authenticate_request() 403s an unconfirmed student before
-            # any of this endpoint's own logic runs.
+            # placement_confirmed=True: authenticate_request() 403s an
+            # unconfirmed student before this endpoint's own logic runs.
             return Student.objects.create(
                 user=user, parents_phone_number="1234567",
                 department=self.department, section=self.section, placement_confirmed=True,
@@ -148,12 +142,10 @@ class AskApiTests(TestCase):
         self.student_80 = make_student("student80@example.com", "Student 80")
         self.enrollment_80 = Enrollment.objects.create(student=self.student_80, course_offering=self.offering_b)
 
-        # Student 57: 2 present, 1 absent -> 67% attendance in offering_a.
         Attendance.objects.create(enrollment=self.enrollment_57, date=date(2026, 2, 1), status=Attendance.Status.PRESENT)
         Attendance.objects.create(enrollment=self.enrollment_57, date=date(2026, 2, 2), status=Attendance.Status.PRESENT)
         Attendance.objects.create(enrollment=self.enrollment_57, date=date(2026, 2, 3), status=Attendance.Status.ABSENT)
 
-        # Student 80's own attendance - must never appear in student 57's context.
         Attendance.objects.create(enrollment=self.enrollment_80, date=date(2026, 2, 1), status=Attendance.Status.PRESENT)
 
         self.private_remark = Remark.objects.create(
@@ -189,8 +181,6 @@ class AskApiTests(TestCase):
             course_offering=self.offering_a, teacher=self.teacher_a,
             title="Late Homework", description="", due_at=now - timedelta(days=1),
         )
-        # Student 80's own assignment, in a different offering - must never
-        # appear in student 57's assignment sources.
         self.other_offering_assignment = Assignment.objects.create(
             course_offering=self.offering_b, teacher=self.teacher_b,
             title="Networking Homework", description="", due_at=now + timedelta(days=5),
@@ -208,8 +198,6 @@ class AskApiTests(TestCase):
         headers = self._auth_headers(user) if user else {}
         return self.client.post(URL, data=json.dumps(body), content_type="application/json", **headers)
 
-    # ── Authentication ───────────────────────────────────────────────────
-
     def test_unauthenticated_request_is_rejected(self):
         response = self.client.post(URL, data=json.dumps({"question": "How am I doing?"}), content_type="application/json")
         self.assertEqual(response.status_code, 401)
@@ -222,13 +210,6 @@ class AskApiTests(TestCase):
         self.assertEqual(data["answer"], _FakeGeminiGenerationService.fixed_answer)
         self.assertIn("sources", data)
 
-    # ── Casual conversation (end-to-end through the real HTTP endpoint) ────
-    # Proves the casual short-circuit reaches all the way through ask_api -
-    # a greeting never touches Gemini, and the response contract (still
-    # {"answer": str, "sources": [...]}) is unchanged. Student 57's own
-    # name ("Student 57") is used, matching build_casual_response's use of
-    # the authenticated user's actual name rather than a hardcoded one.
-
     @patch("ai_assistant.orchestrator.GeminiGenerationService", _FakeGeminiGenerationService)
     def test_casual_greeting_never_reaches_gemini(self):
         _FakeGeminiGenerationService.last_question = None
@@ -238,7 +219,6 @@ class AskApiTests(TestCase):
         data = response.json()
         self.assertEqual(data["sources"], [])
         self.assertIn("Student", data["answer"])
-        # If Gemini had been called, last_question would have been set.
         self.assertIsNone(_FakeGeminiGenerationService.last_question)
 
     @patch("ai_assistant.orchestrator.GeminiGenerationService", _FakeGeminiGenerationService)
@@ -252,15 +232,47 @@ class AskApiTests(TestCase):
 
     @patch("ai_assistant.orchestrator.GeminiGenerationService", _FailingGeminiGenerationService)
     def test_greeting_plus_attendance_question_still_reaches_gemini(self):
-        # "hi, how is my attendance?" is NOT purely casual - it must still
+        # "hi, how is my attendance?" is not purely casual - it must still
         # route to the attendance domain and reach Gemini normally. Using
-        # the FAILING fake service here proves this: if the casual layer
-        # incorrectly swallowed this question, no exception would surface
-        # and this assertion would catch the missing 503.
+        # the failing fake service here proves this: if the casual layer
+        # incorrectly swallowed this question, this would miss the 503.
         response = self._post({"question": "hi, how is my attendance?"}, user=self.student_57.user)
         self.assertEqual(response.status_code, 503)
 
-    # ── Authorization ────────────────────────────────────────────────────
+    @patch("ai_assistant.orchestrator.GeminiGenerationService", _FakeGeminiGenerationService)
+    def test_future_course_recommendation_returns_grounded_message_with_no_sources(self):
+        _FakeGeminiGenerationService.last_question = None
+        response = self._post(
+            {"question": "What courses will you recommend me in future?"}, user=self.student_57.user,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["sources"], [])
+        self.assertIsNone(_FakeGeminiGenerationService.last_question)
+
+    @patch("ai_assistant.orchestrator.GeminiGenerationService", _FakeGeminiGenerationService)
+    def test_plain_course_question_still_returns_current_courses(self):
+        response = self._post({"question": "Which subjects am I having?"}, user=self.student_57.user)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertGreater(len(response.json()["sources"]), 0)
+
+    @patch("ai_assistant.orchestrator.GeminiGenerationService", _FakeGeminiGenerationService)
+    def test_no_remark_above_similarity_threshold_returns_not_enough_info_without_gemini(self):
+        # Every one of student_57's authorized remarks is embedded far
+        # (>0.6 cosine distance) from the angle-0 query vector this fake
+        # service always returns, so none pass the threshold.
+        RemarkEmbedding.objects.filter(remark=self.visible_remark).update(embedding=_vector(170))
+        _FakeGeminiGenerationService.last_question = None
+
+        response = self._post({"question": "What are my weaknesses?"}, user=self.student_57.user)
+
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertEqual(data["sources"], [])
+        self.assertIn("not enough information", data["answer"].lower())
+        self.assertIsNone(_FakeGeminiGenerationService.last_question)
 
     @patch("ai_assistant.orchestrator.GeminiGenerationService", _FakeGeminiGenerationService)
     def test_student_receives_only_authorized_feedback(self):
@@ -286,8 +298,7 @@ class AskApiTests(TestCase):
             {"question": "What are my weaknesses?", "student_id": self.student_80.id}, user=self.student_57.user,
         )
         ids = {s["remark_id"] for s in response.json()["sources"]}
-        # student_id in the body is simply never read - result is identical
-        # to not sending it: student_57's own authorized remark only.
+        # student_id in the body is simply never read.
         self.assertEqual(ids, {self.visible_remark.id})
         self.assertNotIn(self.other_teacher_remark.id, ids)
 
@@ -313,8 +324,6 @@ class AskApiTests(TestCase):
 
         self.assertEqual(direct_ids, api_ids)
 
-    # ── Source integrity ─────────────────────────────────────────────────
-
     @patch("ai_assistant.orchestrator.GeminiGenerationService", _FakeGeminiGenerationService)
     def test_backend_generated_source_ids_match_retrieved_remarks(self):
         response = self._post({"question": "What are my weaknesses?"}, user=self.teacher_a.user)
@@ -327,9 +336,8 @@ class AskApiTests(TestCase):
 
     @patch("ai_assistant.orchestrator.GeminiGenerationService")
     def test_gemini_generated_text_cannot_invent_backend_source_ids(self, mock_service_cls):
-        # Even if the (mocked) model's answer text contains a fabricated-
-        # looking id, the response's sources array is built entirely from
-        # context["sources"] and is unaffected by what the answer text says.
+        # The response's sources array is built entirely from
+        # context["sources"], unaffected by what the answer text says.
         class _InjectingService:
             def __init__(self, *a, **k):
                 pass
@@ -343,14 +351,11 @@ class AskApiTests(TestCase):
         self.assertEqual(ids, {self.visible_remark.id})
         self.assertNotIn(999999, ids)
 
-    # ── Empty retrieval ──────────────────────────────────────────────────
-
     def test_empty_retrieval_returns_safe_answer_and_empty_sources(self):
-        # Deliberately NOT mocking GeminiGenerationService here: with zero
+        # Deliberately not mocking GeminiGenerationService here: with zero
         # retrieved remarks, the orchestrator's own "no items from any
-        # routed domain" check (Phase 10B) returns the safe message WITHOUT
-        # ever constructing GeminiGenerationService at all - so this test
-        # proves no Gemini call happens, using the real service class.
+        # routed domain" check returns the safe message without constructing
+        # GeminiGenerationService at all.
         new_user = User.objects.create_user(email="lonely@example.com", name="Lonely", password="x", role="student")
         lonely_student = Student.objects.create(
             user=new_user, parents_phone_number="1234567",
@@ -360,8 +365,6 @@ class AskApiTests(TestCase):
         data = response.json()
         self.assertEqual(data["sources"], [])
         self.assertIn("not enough", data["answer"].lower())
-
-    # ── Validation ───────────────────────────────────────────────────────
 
     def test_empty_question_is_rejected(self):
         response = self._post({"question": "   "}, user=self.student_57.user)
@@ -392,16 +395,12 @@ class AskApiTests(TestCase):
         response = self.client.get(URL, **self._auth_headers(self.student_57.user))
         self.assertEqual(response.status_code, 405)
 
-    # ── Failure handling ─────────────────────────────────────────────────
-
     @patch("ai_assistant.orchestrator.GeminiGenerationService", _FailingGeminiGenerationService)
     def test_gemini_failure_produces_controlled_error(self):
         response = self._post({"question": "What are my weaknesses?"}, user=self.teacher_a.user)
         self.assertEqual(response.status_code, 503)
         self.assertNotIn("RuntimeError", response.json()["error"])
         self.assertNotIn("Gemini generation request failed", response.json()["error"])
-
-    # ── No sensitive data ever exposed ──────────────────────────────────
 
     @patch("ai_assistant.orchestrator.GeminiGenerationService", _FakeGeminiGenerationService)
     def test_api_key_never_exposed_in_success_response(self):
@@ -420,8 +419,6 @@ class AskApiTests(TestCase):
         self.assertNotIn("embedding", body)
         self.assertNotIn("distance", body)
 
-    # ── Phase 10B: domain routing through the real endpoint ─────────────
-
     @patch("ai_assistant.orchestrator.GeminiGenerationService", _FakeGeminiGenerationService)
     def test_attendance_question_returns_attendance_sources_only(self):
         response = self._post({"question": "How is my attendance?"}, user=self.student_57.user)
@@ -430,7 +427,6 @@ class AskApiTests(TestCase):
         self.assertTrue(sources)
         for s in sources:
             self.assertEqual(s["type"], "attendance")
-        # No remark ever leaks into an attendance-only answer's sources.
         self.assertNotIn("remark_id", json.dumps(sources))
 
     @patch("ai_assistant.orchestrator.GeminiGenerationService", _FakeGeminiGenerationService)
@@ -444,9 +440,6 @@ class AskApiTests(TestCase):
     def test_attendance_question_excludes_another_students_attendance(self):
         response = self._post({"question": "How is my attendance?"}, user=self.student_57.user)
         sources = response.json()["sources"]
-        # student_80's enrollment is in offering_b (course "Networks") -
-        # student_57 is only enrolled in offering_a ("Databases"), so a
-        # leak would show up as an unexpected course name here.
         course_names = {s["course_name"] for s in sources}
         self.assertEqual(course_names, {"Databases"})
 
@@ -479,10 +472,7 @@ class AskApiTests(TestCase):
         )
         sources = response.json()["sources"]
         course_names = {s["course_name"] for s in sources}
-        # Still only student_57's own course, never student_80's.
         self.assertEqual(course_names, {"Databases"})
-
-    # ── Phase 10C: assignment domain routing through the real endpoint ──
 
     @patch("ai_assistant.orchestrator.GeminiGenerationService", _FakeGeminiGenerationService)
     def test_assignment_question_returns_assignment_sources_only(self):
@@ -539,8 +529,6 @@ class AskApiTests(TestCase):
         types = {s["type"] for s in response.json()["sources"]}
         self.assertEqual(types, {"attendance", "assignment"})
 
-    # ── Phase 10D: course domain routing through the real endpoint ──────
-
     @patch("ai_assistant.orchestrator.GeminiGenerationService", _FakeGeminiGenerationService)
     def test_course_question_returns_course_sources_only(self):
         response = self._post({"question": "Who teaches me?"}, user=self.student_57.user)
@@ -557,7 +545,6 @@ class AskApiTests(TestCase):
         self.assertEqual(len(sources), 1)
         self.assertEqual(sources[0]["course_name"], "Databases")
         self.assertEqual(sources[0]["teacher_name"], "Teacher A")
-        # student_80's course ("Networks") must never appear for student_57.
         course_names = {s["course_name"] for s in sources}
         self.assertNotIn("Networks", course_names)
 
@@ -574,8 +561,6 @@ class AskApiTests(TestCase):
 
     @patch("ai_assistant.orchestrator.GeminiGenerationService", _FakeGeminiGenerationService)
     def test_teacher_feedback_question_does_not_return_course_sources(self):
-        # Bare "teacher" must not trigger the courses domain - re-verified
-        # end-to-end, not just at the router/orchestrator unit level.
         response = self._post(
             {"question": "What did my teacher say about my performance?"}, user=self.student_57.user,
         )
@@ -605,8 +590,6 @@ class AskApiTests(TestCase):
         types = {s["type"] for s in response.json()["sources"]}
         self.assertEqual(types, {"course", "attendance", "assignment", "remark"})
 
-    # ── Phase 10E: overall trigger and course-not-found through the API ─
-
     @patch("ai_assistant.orchestrator.GeminiGenerationService", _FakeGeminiGenerationService)
     def test_overall_question_activates_all_four_domains_through_api(self):
         response = self._post({"question": "Give me an overall academic summary."}, user=self.student_57.user)
@@ -615,9 +598,8 @@ class AskApiTests(TestCase):
         self.assertEqual(types, {"course", "attendance", "assignment", "remark"})
 
     def test_unenrolled_course_mention_returns_explicit_not_found_message(self):
-        # student_57 is enrolled only in "Databases" - "Physics" doesn't exist
-        # for them. No GeminiGenerationService mock needed: this must short-
-        # circuit before any Gemini call happens at all.
+        # student_57 is enrolled only in "Databases". No GeminiGenerationService
+        # mock needed: this must short-circuit before any Gemini call.
         response = self._post({"question": "How am I doing in Physics?"}, user=self.student_57.user)
         self.assertEqual(response.status_code, 200)
         data = response.json()
@@ -628,12 +610,9 @@ class AskApiTests(TestCase):
 @patch("ai_assistant.retrieval.semantic_remarks.GeminiEmbeddingService", _FakeGeminiEmbeddingService)
 class CourseScopedNarrowingApiTests(TestCase):
     """
-    Phase 10E: proves course-specific narrowing actually excludes an
-    AUTHORIZED-but-different course's data, not just data the student was
-    never authorized for in the first place. Isolated from AskApiTests'
-    shared fixture so this doesn't change any existing single-course
-    assertions there - this student is enrolled in TWO courses specifically
-    to make that distinction testable.
+    Proves course-specific narrowing actually excludes an authorized-but-
+    different course's data, not just data the student was never authorized
+    for. This student is enrolled in two courses to make that testable.
     """
 
     def setUp(self):
@@ -755,9 +734,8 @@ class CourseScopedNarrowingApiTests(TestCase):
 
     @patch("ai_assistant.orchestrator.GeminiGenerationService", _FakeGeminiGenerationService)
     def test_unscoped_question_still_returns_both_courses_data(self):
-        # Sanity check: without course narrowing, both are visible - proves
-        # the narrowing test above is actually narrowing, not just an
-        # artifact of authorization already excluding "Networks".
+        # Without course narrowing, both are visible - proves the narrowing
+        # test above is actually narrowing.
         response = self._post({"question": "What are my weaknesses?"})
         remark_sources = [s for s in response.json()["sources"] if s["type"] == "remark"]
         course_names = {s["course_name"] for s in remark_sources}

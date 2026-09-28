@@ -22,7 +22,6 @@ class _FakeUser:
 
 class ClassifyCasualIntentTests(SimpleTestCase):
 
-    # ── Greetings ────────────────────────────────────────────────────
     def test_hello(self):
         self.assertEqual(classify_casual_intent("hello"), GREETING)
 
@@ -45,7 +44,6 @@ class ClassifyCasualIntentTests(SimpleTestCase):
         self.assertEqual(classify_casual_intent("Hi!"), GREETING)
         self.assertEqual(classify_casual_intent("  HELLO  "), GREETING)
 
-    # ── Well-being ───────────────────────────────────────────────────
     def test_how_are_you(self):
         self.assertEqual(classify_casual_intent("how are you"), WELLBEING)
         self.assertEqual(classify_casual_intent("how are you?"), WELLBEING)
@@ -59,7 +57,6 @@ class ClassifyCasualIntentTests(SimpleTestCase):
     def test_hey_how_are_u(self):
         self.assertEqual(classify_casual_intent("hey how are u"), WELLBEING)
 
-    # ── Thanks ───────────────────────────────────────────────────────
     def test_thanks(self):
         self.assertEqual(classify_casual_intent("thanks"), THANKS)
 
@@ -72,7 +69,6 @@ class ClassifyCasualIntentTests(SimpleTestCase):
     def test_thank_you_so_much(self):
         self.assertEqual(classify_casual_intent("thank you so much"), THANKS)
 
-    # ── Goodbye ──────────────────────────────────────────────────────
     def test_bye(self):
         self.assertEqual(classify_casual_intent("bye"), GOODBYE)
 
@@ -85,7 +81,6 @@ class ClassifyCasualIntentTests(SimpleTestCase):
     def test_see_you_later(self):
         self.assertEqual(classify_casual_intent("see you later"), GOODBYE)
 
-    # ── Not casual: empty / unrelated ───────────────────────────────
     def test_empty_string_is_not_casual(self):
         self.assertIsNone(classify_casual_intent(""))
         self.assertIsNone(classify_casual_intent("   "))
@@ -93,7 +88,6 @@ class ClassifyCasualIntentTests(SimpleTestCase):
     def test_unrelated_academic_question_is_not_casual(self):
         self.assertIsNone(classify_casual_intent("What is my GPA?"))
 
-    # ── Ambiguous cases: casual word + academic content must NOT classify as casual ──
     def test_hi_plus_attendance_question_is_not_casual(self):
         self.assertIsNone(classify_casual_intent("hi, how is my attendance?"))
 

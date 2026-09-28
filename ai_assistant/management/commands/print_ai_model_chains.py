@@ -1,15 +1,8 @@
 """
-Development-only diagnostic: prints the resolved Gemini model fallback
-chain for both AI capabilities (Student Assistant and Assignment
-Evaluation), exactly as GeminiGenerationService/AssignmentEvaluationService
-would build it from current settings - so a misconfiguration (e.g. an
-empty GEMINI_FALLBACK_MODELS, as diagnosed on 2026-09-15: the .env file
-never defined it at all, so the assistant silently ran with a 1-model
-chain and had nowhere to fall back to on a NOT_FOUND) is visible with one
-command, before any real Gemini request is made.
-
-Never prints GEMINI_API_KEY or any other secret. Not wired into any URL/
-API - `manage.py` only.
+Development-only diagnostic: prints the resolved Gemini model fallback chain
+for both AI capabilities, exactly as built from current settings, so a
+misconfiguration (e.g. empty GEMINI_FALLBACK_MODELS) is visible before any
+real Gemini request is made. Never prints GEMINI_API_KEY. manage.py only.
 
 Usage:
     python manage.py print_ai_model_chains

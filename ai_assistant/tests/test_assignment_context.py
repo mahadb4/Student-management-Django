@@ -1,12 +1,8 @@
 """
-Phase 10C tests: build_assignment_context.
-
-Authorization is entirely delegated to
-assignments.authorization.get_assignments_queryset_for_user (unchanged) -
-these tests focus on the new status-derivation logic (submitted/overdue/
-pending) and re-confirm the scoping boundary holds through this new entry
-point too, including DROPPED-enrollment exclusion and cross-student
-submission isolation.
+Tests for build_assignment_context. Authorization is entirely delegated to
+assignments.authorization.get_assignments_queryset_for_user - these tests
+focus on the status-derivation logic (submitted/overdue/pending), DROPPED-
+enrollment exclusion, and cross-student submission isolation.
 """
 from datetime import date, timedelta
 
@@ -71,7 +67,6 @@ class AssignmentContextTests(TestCase):
         self.enrollment = Enrollment.objects.create(
             student=self.student, course_offering=self.offering, status=Enrollment.Status.ACTIVE,
         )
-        # Both students enrolled in the same offering, for cross-student isolation checks.
         self.other_enrollment = Enrollment.objects.create(
             student=self.other_student, course_offering=self.offering, status=Enrollment.Status.ACTIVE,
         )
@@ -95,14 +90,11 @@ class AssignmentContextTests(TestCase):
         )
         Submission.objects.create(assignment=self.submitted_assignment, student=self.student, file_key="submissions/x.pdf")
 
-        # A DROPPED-course assignment - must never appear for `student`.
         self.dropped_course_assignment = Assignment.objects.create(
             course_offering=self.dropped_offering, teacher=self.teacher,
             title="Networks Homework", description="", due_at=now + timedelta(days=3),
         )
 
-        # Another student's own submission on a shared assignment - must
-        # never affect `student`'s own status for that same assignment.
         Submission.objects.create(assignment=self.pending_assignment, student=self.other_student, file_key="submissions/y.pdf")
 
     def test_overdue_pending_submitted_statuses_derived_correctly(self):
@@ -121,11 +113,7 @@ class AssignmentContextTests(TestCase):
         self.assertIn("1 submitted", text)
 
     def test_summary_text_explicitly_disclaims_grading(self):
-        # The point isn't that the word "grade" never appears - it's that
-        # the text never CLAIMS a grade/review happened. The correct way to
-        # prevent that implication is an explicit disclaimer, which is what
-        # this asserts (rather than banning the word "grade" outright, which
-        # would also flag the disclaimer sentence itself as a false positive).
+        # The text must never claim a grade/review happened.
         context = build_assignment_context(self.student.user)
         text = context["prompt_item"]["text"].lower()
         self.assertIn("does not mean graded", text)
@@ -139,15 +127,11 @@ class AssignmentContextTests(TestCase):
         self.assertNotIn("Networks Homework", titles)
 
     def test_another_students_submission_does_not_affect_this_students_status(self):
-        # other_student submitted pending_assignment - student did not.
-        # student's own status for that assignment must still be "pending".
         context = build_assignment_context(self.student.user)
         by_title = {s["title"]: s for s in context["sources"]}
         self.assertEqual(by_title["Upcoming Homework"]["status"], "pending")
 
     def test_another_students_assignments_never_leak(self):
-        # other_student is enrolled in the same offering, so this mainly
-        # confirms no duplicate/foreign rows sneak in via the join.
         context = build_assignment_context(self.student.user)
         self.assertEqual(len(context["sources"]), 3)
 
@@ -156,7 +140,6 @@ class AssignmentContextTests(TestCase):
         by_title = {s["title"]: s for s in context["sources"]}
         self.assertTrue(by_title["Completed Homework"]["attachment_available"])
         self.assertFalse(by_title["Past Homework"]["attachment_available"])
-        # No S3 key, URL, or file content anywhere in the source or prompt text.
         dump = str(context)
         self.assertNotIn("attachment_key", dump)
         self.assertNotIn(".pdf", dump)
@@ -177,8 +160,6 @@ class AssignmentContextTests(TestCase):
         self.assertEqual(context["sources"], [])
 
     def test_teacher_caller_gets_no_teacher_side_analytics(self):
-        # Phase 10C is explicitly student-focused - a teacher asking gets a
-        # safe "not available" response, not course-level submission counts.
         context = build_assignment_context(self.teacher.user)
         self.assertEqual(context["sources"], [])
         self.assertIn("No assignment information is available", context["prompt_item"]["text"])

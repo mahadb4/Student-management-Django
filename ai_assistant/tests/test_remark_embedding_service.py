@@ -1,8 +1,6 @@
 """
-Phase 4 tests: the embed_remark persistence operation.
-
-A fake embedding service is injected everywhere - no real Gemini API calls,
-no real GEMINI_API_KEY required.
+Tests for the embed_remark persistence operation. A fake embedding service is
+injected everywhere - no real Gemini API calls required.
 """
 from datetime import date
 
@@ -24,8 +22,7 @@ from users.models import User
 class _FakeEmbeddingService:
     def __init__(self, values=None, exception=None):
         # 0.25 is exactly representable in float32, so it survives the
-        # pgvector DB round-trip without precision drift affecting equality
-        # assertions below.
+        # pgvector DB round-trip without precision drift.
         self._values = values or [0.25] * EMBEDDING_DIMENSIONS
         self._exception = exception
         self.calls = []
@@ -66,8 +63,6 @@ class RemarkEmbeddingServiceTests(TestCase):
             remark_text="Struggling with joins.", visibility=Remark.Visibility.PRIVATE,
         )
 
-    # ── create / update, no duplication ─────────────────────────────────
-
     def test_embed_remark_creates_embedding(self):
         service = _FakeEmbeddingService()
         embed_remark(self.remark, embedding_service=service)
@@ -96,16 +91,12 @@ class RemarkEmbeddingServiceTests(TestCase):
         self.assertEqual(service.calls, ["Struggling with joins."])
 
     def test_only_remark_text_is_sent_to_the_embedding_service(self):
-        # Guards against accidentally constructing a string containing
-        # teacher/student/course names - only remark.remark_text may be sent.
         service = _FakeEmbeddingService()
         embed_remark(self.remark, embedding_service=service)
 
         self.assertEqual(service.calls, [self.remark.remark_text])
         for leaked in ("Teacher", "Student", "Databases", "CS101"):
             self.assertNotIn(leaked, service.calls[0])
-
-    # ── failure handling: no invalid rows ───────────────────────────────
 
     def test_embedding_failure_does_not_create_a_row(self):
         service = _FakeEmbeddingService(exception=EmbeddingGenerationError("boom"))
@@ -126,16 +117,12 @@ class RemarkEmbeddingServiceTests(TestCase):
         obj = RemarkEmbedding.objects.get(remark=self.remark)
         self.assertEqual(list(obj.embedding), [0.5] * EMBEDDING_DIMENSIONS)
 
-    # ── Remark model itself is unchanged ────────────────────────────────
-
     def test_remark_model_has_no_new_concrete_fields(self):
         concrete_field_names = {f.name for f in Remark._meta.fields}
         self.assertEqual(
             concrete_field_names,
             {"id", "student", "teacher", "course_offering", "remark_text", "visibility", "created_at", "updated_at"},
         )
-
-    # ── staleness detection ──────────────────────────────────────────────
 
     def test_remark_with_no_embedding_is_stale(self):
         self.assertTrue(remark_embedding_is_stale(self.remark))
@@ -151,8 +138,6 @@ class RemarkEmbeddingServiceTests(TestCase):
         self.remark.save(update_fields=["remark_text"])
         self.remark.refresh_from_db()
         self.assertTrue(remark_embedding_is_stale(self.remark))
-
-    # ── cascade delete ───────────────────────────────────────────────────
 
     def test_deleting_remark_deletes_its_embedding(self):
         embed_remark(self.remark, embedding_service=_FakeEmbeddingService())

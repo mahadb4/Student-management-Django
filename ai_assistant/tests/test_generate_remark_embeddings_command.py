@@ -1,9 +1,6 @@
 """
-Phase 4 tests: the generate_remark_embeddings backfill command.
-
-GeminiEmbeddingService is patched at its import site inside the command
-module, so no real Gemini API calls happen and no real GEMINI_API_KEY is
-required.
+Tests for the generate_remark_embeddings backfill command. GeminiEmbeddingService
+is patched at its import site, so no real Gemini API calls happen.
 """
 from datetime import date
 from io import StringIO

@@ -1,13 +1,8 @@
 """
-Phase 10B: structured Attendance context - the "SQL side" of the hybrid
-assistant. Attendance is relational/countable data, so it is never
-embedded or semantically searched; it's aggregated directly from the
-database and handed to Gemini as an already-computed summary. Gemini's
-job here is explanation, not arithmetic.
-
-This module performs no authorization of its own beyond calling the
-existing common.permissions.apply_data_scope("attendance") - the exact
-same function every other Attendance view in this project already uses.
+Structured Attendance context. Attendance is relational/countable data, so it
+is aggregated directly from the database and handed to Gemini as an
+already-computed summary rather than embedded/semantically searched.
+Authorization is delegated to common.permissions.apply_data_scope.
 """
 from attendance.models import Attendance
 from common.permissions import apply_data_scope
@@ -17,22 +12,17 @@ def build_attendance_context(user, course_offering_id=None):
     """
     Returns:
         {
-            "prompt_item": {...},  # Option A compatibility wrapper for
-                                    # GeminiGenerationService's existing
-                                    # {teacher_name, course_name, created_at,
-                                    # text} item shape (Phase 7, unchanged).
-                                    # created_at is deliberately "" - this
-                                    # is a computed summary, not a dated
-                                    # record, and must never look like one
-                                    # to the model.
-            "sources": [...],      # honest, domain-specific source entries
-                                    # for the frontend - {"type": "attendance",
-                                    # "course_name", "detail"} per course.
+            "prompt_item": {...},  # compatibility wrapper for
+                                    # GeminiGenerationService's item shape.
+                                    # created_at is deliberately "" since
+                                    # this is a computed summary, not a
+                                    # dated record.
+            "sources": [...],      # {"type": "attendance", "course_name",
+                                    # "detail"} per course.
         }
 
-    `course_offering_id` (Phase 10E), if given, narrows the ALREADY-
-    authorized attendance queryset to just that offering - applied AFTER
-    apply_data_scope, never instead of it.
+    `course_offering_id`, if given, narrows the already-authorized queryset
+    to just that offering, applied after apply_data_scope.
     """
     qs = apply_data_scope(user, Attendance.objects.all(), "attendance").select_related(
         "enrollment__course_offering__course"

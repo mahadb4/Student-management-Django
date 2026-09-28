@@ -1,32 +1,12 @@
 """
-Phase 10D/10E: structured Courses/Enrollments context - the third "SQL
-side" source of the hybrid assistant, alongside Attendance (10B) and
-Assignments (10C). Never embedded or semantically searched.
+Structured Courses/Enrollments context. Never embedded or semantically
+searched. Authorization is delegated to common.permissions.apply_data_scope.
 
-This module performs no authorization of its own beyond calling the
-existing common.permissions.apply_data_scope("enrollment") - the same
-function Attendance (10B) already reuses.
+Only ACTIVE enrollments are included, reflecting the student's current
+academic situation; DROPPED/COMPLETED are deliberately excluded.
 
-Student-focused only: a caller with no student_profile gets a safe "not
-available" response, same pattern as assignment_context.
-
-Scope decision (approved): only ACTIVE enrollments are included - this
-reflects the student's CURRENT academic situation. DROPPED and COMPLETED
-enrollments are deliberately excluded here; a historical/"what have I
-completed" capability would be a separate, later addition, not silently
-included in this context.
-
-The instructor shown is always CourseOffering.teacher (the actual teacher
-of record for the specific offering the student is enrolled in) - never
-Course.teacher, which is a separate, potentially different/stale field on
-the Course template itself.
-
-Phase 10E adds an optional course_offering_id narrowing parameter, applied
-AFTER the existing authorized queryset (never instead of it), plus
-get_active_enrollments_for_user - the single authorized source both
-build_course_context and ai_assistant.course_resolution.resolve_mentioned_
-course read from, so course-name resolution's search space can never
-include a course the student isn't already allowed to see.
+The instructor shown is always CourseOffering.teacher (the actual teacher of
+record for this offering), never Course.teacher, which can be stale.
 """
 from common.permissions import apply_data_scope
 from enrollments.models import Enrollment
@@ -51,19 +31,16 @@ def build_course_context(user, course_offering_id=None):
     """
     Returns:
         {
-            "prompt_item": {...},  # Option A compatibility wrapper for
-                                    # GeminiGenerationService's existing
-                                    # item shape (Phase 7, unchanged).
+            "prompt_item": {...},  # compatibility wrapper for
+                                    # GeminiGenerationService's item shape.
             "sources": [...],      # {"type": "course", "course_name",
                                     # "course_code", "teacher_name",
-                                    # "section_name"} per active enrollment
-                                    # (or the single one, if narrowed).
+                                    # "section_name"} per active enrollment.
                                     # No internal enrollment/offering IDs.
         }
 
-    `course_offering_id`, if given, narrows the ALREADY-authorized active-
-    enrollments queryset to just that offering - it never replaces or
-    widens the authorization check itself.
+    `course_offering_id`, if given, narrows the already-authorized queryset
+    to just that offering - it never replaces the authorization check.
     """
     student = getattr(user, "student_profile", None)
     if not student:

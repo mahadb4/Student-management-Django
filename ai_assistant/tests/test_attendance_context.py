@@ -1,10 +1,6 @@
 """
-Phase 10B tests: build_attendance_context.
-
-Authorization is entirely delegated to common.permissions.apply_data_scope
-(unchanged, already covered by ai_assistant/tests/test_scope.py) - these
-tests focus on the new aggregation math and on re-confirming the scoping
-boundary holds through this new entry point too.
+Tests for build_attendance_context. Authorization is entirely delegated to
+common.permissions.apply_data_scope - these tests focus on the aggregation math.
 """
 from datetime import date
 
@@ -88,14 +84,12 @@ class AttendanceContextTests(TestCase):
             student=self.other_student, course_offering=self.other_offering,
         )
 
-        # Student: Maths - 2 present, 1 late; Basic Computing - 1 present, 1 absent.
         Attendance.objects.create(enrollment=self.enrollment_maths, date=date(2026, 2, 1), status=Attendance.Status.PRESENT)
         Attendance.objects.create(enrollment=self.enrollment_maths, date=date(2026, 2, 2), status=Attendance.Status.PRESENT)
         Attendance.objects.create(enrollment=self.enrollment_maths, date=date(2026, 2, 3), status=Attendance.Status.LATE)
         Attendance.objects.create(enrollment=self.enrollment_cs, date=date(2026, 2, 1), status=Attendance.Status.PRESENT)
         Attendance.objects.create(enrollment=self.enrollment_cs, date=date(2026, 2, 2), status=Attendance.Status.ABSENT)
 
-        # Other student's attendance - must never appear in `student`'s context.
         Attendance.objects.create(
             enrollment=self.other_student_enrollment, date=date(2026, 2, 1), status=Attendance.Status.ABSENT,
         )
@@ -104,14 +98,14 @@ class AttendanceContextTests(TestCase):
         context = build_attendance_context(self.student.user)
         text = context["prompt_item"]["text"]
         self.assertIn("5 total classes, 3 present, 1 late, 1 absent", text)
-        self.assertIn("60% attendance", text)  # 3/5 = 60%
+        self.assertIn("60% attendance", text)
 
     def test_per_course_breakdown_in_sources(self):
         context = build_attendance_context(self.student.user)
         by_course = {s["course_name"]: s for s in context["sources"]}
         self.assertEqual(set(by_course.keys()), {"Maths", "Basic Computing"})
-        self.assertIn("67%", by_course["Maths"]["detail"])  # 2/3 present, rounds to 67%
-        self.assertIn("50%", by_course["Basic Computing"]["detail"])  # 1/2 present
+        self.assertIn("67%", by_course["Maths"]["detail"])
+        self.assertIn("50%", by_course["Basic Computing"]["detail"])
 
     def test_sources_are_attendance_typed(self):
         context = build_attendance_context(self.student.user)
@@ -126,16 +120,11 @@ class AttendanceContextTests(TestCase):
 
     def test_teacher_sees_only_their_own_offerings_attendance(self):
         context = build_attendance_context(self.teacher.user)
-        # Teacher A teaches Maths + Basic Computing (5 records total), not
-        # the other teacher's Networks offering (1 record) - must be excluded.
         self.assertIn("5 total classes", context["prompt_item"]["text"])
         course_names = {s["course_name"] for s in context["sources"]}
         self.assertNotIn("Networks", course_names)
 
     def test_prompt_item_has_no_real_created_at(self):
-        # Option A compatibility wrapper: this is a computed summary, not a
-        # dated record - created_at must stay empty so it never looks like
-        # a real timestamped source to the model.
         context = build_attendance_context(self.student.user)
         self.assertEqual(context["prompt_item"]["created_at"], "")
 

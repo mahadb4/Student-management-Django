@@ -1,20 +1,16 @@
 """
-Phase 6 tests: deterministic context construction from Phase 5 retrieval
-results.
+Tests for deterministic context construction from semantic retrieval results.
 
-This entire test file uses django.test.SimpleTestCase, not TestCase - that
-is itself part of the proof for requirement #12 ("context builder performs
-no authorization/database retrieval of its own"): SimpleTestCase forbids
-any database access and raises an error if a test tries to use the ORM.
-If build_remark_context ever queried the database, every test below would
-fail immediately with "Database access not allowed", regardless of what it
-asserts about the returned value.
+This file uses django.test.SimpleTestCase, not TestCase: SimpleTestCase
+forbids database access, so if build_remark_context ever queried the
+database, every test below would fail immediately, proving it performs no
+authorization/database retrieval of its own.
 """
 from django.test import SimpleTestCase
 
 from ai_assistant.context.remark_context import build_remark_context
 
-# Mirrors the exact shape returned by
+# Mirrors the shape returned by
 # ai_assistant.retrieval.semantic_remarks.get_semantically_relevant_remarks
 RESULT_A = {
     "remark_id": 1,
@@ -47,8 +43,6 @@ RESULT_C = {
 
 class RemarkContextBuilderTests(SimpleTestCase):
 
-    # ── Field preservation ───────────────────────────────────────────────
-
     def test_converts_results_into_expected_item_format(self):
         context = build_remark_context([RESULT_A])
         self.assertEqual(context["items"], [{
@@ -74,24 +68,18 @@ class RemarkContextBuilderTests(SimpleTestCase):
         context = build_remark_context([RESULT_A])
         self.assertEqual(context["items"][0]["created_at"], "2026-02-01T00:00:00+00:00")
 
-    # ── Ordering ─────────────────────────────────────────────────────────
-
     def test_ordering_from_retrieval_is_preserved_not_resorted(self):
         # C has the largest "distance" (least similar) but is passed first;
-        # the builder must not re-rank - that's Phase 5's job, already done.
+        # the builder must not re-rank.
         context = build_remark_context([RESULT_C, RESULT_A, RESULT_B])
         self.assertEqual(
             [item["text"] for item in context["items"]],
             [RESULT_C["text"], RESULT_A["text"], RESULT_B["text"]],
         )
 
-    # ── Empty input ──────────────────────────────────────────────────────
-
     def test_empty_retrieval_produces_empty_safe_context(self):
         context = build_remark_context([])
         self.assertEqual(context, {"items": [], "sources": [], "truncated": False})
-
-    # ── Source references ───────────────────────────────────────────────
 
     def test_sources_preserve_correct_remark_ids(self):
         context = build_remark_context([RESULT_A, RESULT_B])
@@ -107,8 +95,6 @@ class RemarkContextBuilderTests(SimpleTestCase):
         context = build_remark_context([RESULT_A, RESULT_B, RESULT_C])
         self.assertEqual(len(context["items"]), len(context["sources"]))
 
-    # ── Sensitive/unnecessary fields are excluded ───────────────────────
-
     def test_embedding_and_distance_never_appear_in_items(self):
         context = build_remark_context([RESULT_A])
         for item in context["items"]:
@@ -122,8 +108,6 @@ class RemarkContextBuilderTests(SimpleTestCase):
             self.assertNotIn("embedding", source)
 
     def test_internal_ids_and_visibility_not_included_in_items(self):
-        # items are what the LLM sees - remark_id, visibility, and any
-        # student/teacher/course internal IDs must not appear there.
         context = build_remark_context([RESULT_A])
         item = context["items"][0]
         self.assertNotIn("remark_id", item)
@@ -135,8 +119,6 @@ class RemarkContextBuilderTests(SimpleTestCase):
     def test_items_contain_exactly_the_expected_keys(self):
         context = build_remark_context([RESULT_A])
         self.assertEqual(set(context["items"][0].keys()), {"teacher_name", "course_name", "created_at", "text"})
-
-    # ── Size limiting ────────────────────────────────────────────────────
 
     def test_max_items_limits_result_count(self):
         context = build_remark_context([RESULT_A, RESULT_B, RESULT_C], max_items=2)
@@ -155,16 +137,12 @@ class RemarkContextBuilderTests(SimpleTestCase):
         self.assertTrue(context["truncated"])
 
     def test_character_budget_never_truncates_a_single_remarks_text(self):
-        # Even a remark that alone exceeds the budget is included whole,
-        # never cut mid-string - truncating feedback text could change its
-        # meaning, so the builder drops whole items, never partial text.
+        # A remark that alone exceeds the budget is still included whole,
+        # never cut mid-string.
         huge_result = dict(RESULT_A, text="y" * 50000)
         context = build_remark_context([huge_result], max_items=10, max_total_characters=10)
         self.assertEqual(len(context["items"]), 1)
         self.assertEqual(context["items"][0]["text"], "y" * 50000)
-
-    # ── No authorization / no DB access (see module docstring: enforced ─
-    # structurally by SimpleTestCase for every test in this file) ────────
 
     def test_builder_works_on_plain_dicts_with_no_database_involved(self):
         context = build_remark_context([RESULT_A, RESULT_B, RESULT_C])

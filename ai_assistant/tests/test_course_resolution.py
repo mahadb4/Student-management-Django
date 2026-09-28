@@ -1,11 +1,7 @@
 """
-Phase 10E tests: resolve_mentioned_course.
-
-Authorization is entirely delegated to
-ai_assistant.context.course_context.get_active_enrollments_for_user
-(Phase 10D, unchanged) - these tests focus on the deterministic matching
-rules (code-first, then name, whole-phrase only, ambiguity handling) and
-re-confirm the search space can never include an unauthorized course.
+Tests for resolve_mentioned_course. Authorization is entirely delegated to
+get_active_enrollments_for_user - these tests focus on the deterministic
+matching rules (code-first, then name, whole-phrase only, ambiguity handling).
 """
 from datetime import date
 
@@ -73,8 +69,6 @@ class CourseResolutionTests(TestCase):
             academic_year=2026, section=self.section,
         )
 
-        # A course the OTHER student is enrolled in, `student` is not -
-        # must never be resolvable from `student`'s questions.
         self.foreign_course = Course.objects.create(
             name="Networks", code="CS302", credits=3, department=self.department, teacher=self.teacher,
         )
@@ -89,8 +83,6 @@ class CourseResolutionTests(TestCase):
             student=self.other_student, course_offering=self.foreign_offering, status=Enrollment.Status.ACTIVE,
         )
 
-    # ── Exact code match ─────────────────────────────────────────────────
-
     def test_exact_course_code_match(self):
         result = resolve_mentioned_course(self.student.user, "How am I doing in CS301?")
         self.assertEqual(result["status"], "matched")
@@ -102,8 +94,6 @@ class CourseResolutionTests(TestCase):
         self.assertEqual(result["status"], "matched")
         self.assertEqual(result["course_offering_id"], self.offering.id)
 
-    # ── Exact name match ─────────────────────────────────────────────────
-
     def test_exact_course_name_match(self):
         result = resolve_mentioned_course(self.student.user, "How am I doing in Database Systems?")
         self.assertEqual(result["status"], "matched")
@@ -111,46 +101,31 @@ class CourseResolutionTests(TestCase):
 
     def test_name_match_handles_extra_whitespace(self):
         result = resolve_mentioned_course(self.student.user, "How am I doing in   Database   Systems?")
-        # Whitespace is normalized (collapsed) before comparison.
         self.assertEqual(result["status"], "matched")
 
-    # ── No loose substring matching ──────────────────────────────────────
-
     def test_math_does_not_ambiguously_match_maths_and_advanced_maths(self):
-        # "Maths" is enrolled; "Advanced Maths" is NOT enrolled by `student`
-        # in this specific test scenario is irrelevant - the real point:
-        # asking about "Maths" must resolve to exactly "Maths", not treat
-        # "Advanced Maths" as also matching merely because it CONTAINS the
-        # substring "Maths". Whole-phrase matching prevents that.
+        # Whole-phrase matching must resolve "Maths" to exactly "Maths",
+        # not treat "Advanced Maths" as matching merely because it contains
+        # the substring "Maths".
         result = resolve_mentioned_course(self.student.user, "How am I doing in Maths?")
         self.assertEqual(result["status"], "matched")
         self.assertEqual(result["course_offering_id"], self.maths_offering.id)
 
     def test_partial_code_does_not_match(self):
-        # "CS3" is a substring of "CS301" but not a whole-word match - must
-        # not resolve (avoids the exact loose-substring risk flagged in the
-        # design review).
+        # "CS3" is a substring of "CS301" but not a whole-word match.
         result = resolve_mentioned_course(self.student.user, "How am I doing in CS3?")
         self.assertNotEqual(result["status"], "matched")
-
-    # ── Ambiguity ────────────────────────────────────────────────────────
 
     def test_ambiguous_when_multiple_authorized_courses_match(self):
         Enrollment.objects.create(
             student=self.student, course_offering=self.advanced_maths_offering, status=Enrollment.Status.ACTIVE,
         )
-        # Neither "Maths" (whole word) nor "Advanced Maths" is literally
-        # present as a full course name in this question, but craft a
-        # scenario where both names appear via a generic reference - here
-        # we directly test the ambiguity path via two matching enrollments
-        # sharing an identical course name (e.g. two sections of the same
-        # course), which is the realistic way ambiguity actually occurs.
+        # Two matching enrollments sharing an identical course name (e.g. two
+        # sections of the same course) is the realistic way ambiguity occurs.
         Course.objects.filter(id=self.advanced_maths_course.id).update(name="Maths")
         result = resolve_mentioned_course(self.student.user, "How am I doing in Maths?")
         self.assertEqual(result["status"], "ambiguous")
-        self.assertEqual(len(result["candidates"]), 1)  # same name, listed once
-
-    # ── Authorization boundary ───────────────────────────────────────────
+        self.assertEqual(len(result["candidates"]), 1)
 
     def test_cannot_resolve_another_students_course(self):
         result = resolve_mentioned_course(self.student.user, "How am I doing in Networks?")
@@ -170,7 +145,5 @@ class CourseResolutionTests(TestCase):
         self.assertNotEqual(result["status"], "matched")
 
     def test_teacher_caller_gets_no_match(self):
-        # Course resolution is student-focused, same scope limit as the
-        # course/assignment context builders.
         result = resolve_mentioned_course(self.teacher.user, "How am I doing in CS301?")
         self.assertNotEqual(result["status"], "matched")

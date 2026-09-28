@@ -1,22 +1,8 @@
 """
-Deterministic casual-conversation layer, checked BEFORE the academic
-domain router (ai_assistant.router.route) and BEFORE course resolution -
-see the top of orchestrator.answer_academic_question. This is a pure UX
-improvement: "hello"/"thanks"/"bye"-style messages get a fixed, friendly
-reply without ever reaching Gemini or any of the authorized domain
-context builders.
-
-Deliberately NOT an LLM classification step (no extra Gemini call just to
-detect small talk, matching this project's existing keyword-router
-philosophy) - a normalized-text match against a small, fixed set of
-patterns. A message is classified as casual only when, after stripping
-punctuation, it matches one of these patterns IN FULL - "hi, how is my
-attendance?" normalizes to "hi how is my attendance", which does not
-fully match any casual pattern, so it correctly falls through to the
-existing academic router untouched. This module has no knowledge of
-attendance/assignments/courses/remarks keywords and never needs any -
-the "must not swallow an academic question" guarantee comes entirely from
-requiring a FULL match, not from cross-checking router keywords.
+Deterministic casual-conversation layer, checked before the academic domain
+router and course resolution. A message is classified as casual only when it
+fully matches a fixed pattern after stripping punctuation, so an academic
+question never gets swallowed by a partial match.
 """
 import re
 
@@ -28,14 +14,10 @@ _WHITESPACE_RE = re.compile(r"\s+")
 _GREETING_PHRASES = {"hi", "hello", "hey", "good morning", "good afternoon", "good evening"}
 _GOODBYE_PHRASES = {"bye", "goodbye", "good bye", "see you", "see you later"}
 
-# Optional leading "hi"/"hey"/"hello" (e.g. "hey how are u") is part of the
-# SAME casual message, not a separate greeting - classified once, as
-# "wellbeing", so the response addresses the well-being question rather
-# than only acknowledging the greeting.
+# A leading "hi"/"hey"/"hello" (e.g. "hey how are u") is classified as wellbeing,
+# not a separate greeting, so the response addresses the well-being question.
 _WELLBEING_RE = re.compile(r"^(?:(?:hi|hey|hello)\s+)?how\s+are\s+(?:you|u|ya)$")
 
-# "thanks" / "thank you" / "thanks a lot" / "thank you so much" and close
-# variants.
 _THANKS_RE = re.compile(r"^thanks?(?:\s+you)?(?:\s+(?:a\s+lot|so\s+much|very\s+much))?$")
 
 GREETING = "greeting"
@@ -53,9 +35,7 @@ def _normalize(text):
 def classify_casual_intent(question):
     """
     Returns one of GREETING/WELLBEING/THANKS/GOODBYE if `question`, once
-    normalized, is PURELY a casual message - or None if it isn't (which
-    includes empty input and any question carrying additional/academic
-    content alongside a greeting-like word).
+    normalized, is purely a casual message, or None otherwise.
     """
     normalized = _normalize(question)
     if not normalized:
@@ -73,10 +53,6 @@ def classify_casual_intent(question):
 
 
 def _student_first_name(user):
-    # `user.name` is the same field every other view in this project reads
-    # for display (see users/api/user_api.py, remark_api.py, etc.) - not a
-    # new lookup, and safe for a user object that happens to lack it
-    # (e.g. AnonymousUser in tests) since getattr just yields "".
     full_name = getattr(user, "name", "") or ""
     first_name, _ = split_display_name(full_name)
     return first_name
@@ -85,9 +61,7 @@ def _student_first_name(user):
 def build_casual_response(intent, user):
     """
     Returns the fixed, friendly reply for `intent` (one of this module's
-    GREETING/WELLBEING/THANKS/GOODBYE constants). Uses the authenticated
-    user's first name where the existing response text calls for one -
-    never hardcoded, and gracefully omitted if the name is unavailable.
+    GREETING/WELLBEING/THANKS/GOODBYE constants).
     """
     first_name = _student_first_name(user)
 

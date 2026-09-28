@@ -1,8 +1,6 @@
 """
-Phase 4 tests: GeminiEmbeddingService.
-
-No real Gemini API calls are made - a fake client is injected, so these
-tests never touch the network and never require a real GEMINI_API_KEY.
+Tests for GeminiEmbeddingService. No real Gemini API calls are made - a fake
+client is injected.
 """
 from django.test import TestCase
 
@@ -61,7 +59,7 @@ class GeminiEmbeddingServiceTests(TestCase):
         self.assertEqual(fake_client.models.last_call_kwargs["contents"], "Improved significantly.")
 
     def test_wrong_dimension_response_is_rejected(self):
-        fake_client = _FakeClient(values=[0.1] * 5)  # wrong size
+        fake_client = _FakeClient(values=[0.1] * 5)
         service = GeminiEmbeddingService(client=fake_client)
 
         with self.assertRaises(EmbeddingGenerationError):

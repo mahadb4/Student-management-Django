@@ -1,12 +1,9 @@
 """
-Phase 5 tests: permission-aware semantic retrieval over Remarks.
-
-No real Gemini API calls - a fake embedding service is injected everywhere,
-returning hand-crafted 768-dim vectors so distances/ordering are exactly
-predictable. RemarkEmbedding rows are created directly (bypassing
-embed_remark) with the same hand-crafted vectors, so this file tests
-retrieval/authorization behavior, not the embedding-generation pipeline
-(already covered in test_remark_embedding_service.py).
+Tests for permission-aware semantic retrieval over Remarks. A fake embedding
+service is injected, returning hand-crafted 768-dim vectors so distances/
+ordering are exactly predictable. RemarkEmbedding rows are created directly
+(bypassing embed_remark), so this file tests retrieval/authorization
+behavior, not the embedding-generation pipeline.
 """
 import math
 from datetime import date
@@ -15,7 +12,11 @@ from django.contrib.auth.models import AnonymousUser
 from django.test import TestCase
 
 from ai_assistant.models import RemarkEmbedding
-from ai_assistant.retrieval.semantic_remarks import get_semantically_relevant_remarks
+from ai_assistant.retrieval.semantic_remarks import (
+    SIMILARITY_DISTANCE_THRESHOLD,
+    TOP_K,
+    get_semantically_relevant_remarks,
+)
 from course_offerings.models import CourseOffering
 from courses.models import Course
 from departments.models import Department
@@ -98,7 +99,6 @@ class SemanticRemarksRetrievalTests(TestCase):
         self.student_80 = make_student("student80@example.com", "Student 80")
         Enrollment.objects.create(student=self.student_80, course_offering=self.offering_b)
 
-        # Remarks about student_57, in teacher_a's offering.
         self.private_remark = Remark.objects.create(
             student=self.student_57, teacher=self.teacher_a, course_offering=self.offering_a,
             remark_text="Struggling with joins.", visibility=Remark.Visibility.PRIVATE,
@@ -107,14 +107,13 @@ class SemanticRemarksRetrievalTests(TestCase):
             student=self.student_57, teacher=self.teacher_a, course_offering=self.offering_a,
             remark_text="Improved significantly.", visibility=Remark.Visibility.STUDENT_VISIBLE,
         )
-        # Remark about student_80, in teacher_b's offering - unrelated to teacher_a/student_57.
         self.other_teacher_remark = Remark.objects.create(
             student=self.student_80, teacher=self.teacher_b, course_offering=self.offering_b,
             remark_text="Excellent grasp of routing.", visibility=Remark.Visibility.STUDENT_VISIBLE,
         )
 
-        # Query vector = angle 0. Give each remark its own embedding at a
-        # controlled angle, so distance-from-query is exactly predictable.
+        # Query vector = angle 0; each remark's embedding is at a controlled
+        # angle, so distance-from-query is exactly predictable.
         RemarkEmbedding.objects.create(
             remark=self.private_remark, embedding=_vector(60), embedded_text=self.private_remark.remark_text,
         )
@@ -127,8 +126,6 @@ class SemanticRemarksRetrievalTests(TestCase):
         )
 
         self.query_service = _FixedVectorEmbeddingService(_vector(0))
-
-    # ── Student authorization ───────────────────────────────────────────
 
     def test_student_retrieves_only_own_authorized_remarks(self):
         results = get_semantically_relevant_remarks(
@@ -146,19 +143,14 @@ class SemanticRemarksRetrievalTests(TestCase):
 
     def test_student_cannot_retrieve_another_students_remarks(self):
         # get_remarks_queryset_for_user's student branch ignores student_id
-        # entirely - a student is always scoped to their OWN remarks,
-        # regardless of what student_id is passed. So student_80 passing
-        # student_57's id does not leak student_57's data; it just returns
-        # student_80's own (unrelated) authorized remark.
+        # entirely - a student is always scoped to their own remarks.
         results = get_semantically_relevant_remarks(
             self.student_80.user, "feedback", student_id=self.student_57.id, embedding_service=self.query_service,
         )
         ids = {r["remark_id"] for r in results}
-        self.assertNotIn(self.visible_remark.id, ids)  # student_57's remark must never leak
+        self.assertNotIn(self.visible_remark.id, ids)
         self.assertNotIn(self.private_remark.id, ids)
-        self.assertEqual(ids, {self.other_teacher_remark.id})  # student_80's own remark, unaffected
-
-    # ── Teacher authorization ────────────────────────────────────────────
+        self.assertEqual(ids, {self.other_teacher_remark.id})
 
     def test_teacher_retrieves_remarks_from_own_offerings(self):
         results = get_semantically_relevant_remarks(
@@ -177,13 +169,10 @@ class SemanticRemarksRetrievalTests(TestCase):
         self.assertEqual(ids, {self.other_teacher_remark.id})
 
     def test_cross_teacher_student_id_probe_returns_no_unauthorized_data(self):
-        # teacher_a has no relationship to student_80 at all.
         results = get_semantically_relevant_remarks(
             self.teacher_a.user, "feedback", student_id=self.student_80.id, embedding_service=self.query_service,
         )
         self.assertEqual(results, [])
-
-    # ── Anonymous / superuser ────────────────────────────────────────────
 
     def test_anonymous_user_gets_no_results(self):
         results = get_semantically_relevant_remarks(
@@ -192,21 +181,20 @@ class SemanticRemarksRetrievalTests(TestCase):
         self.assertEqual(results, [])
 
     def test_superuser_sees_all_embedded_remarks(self):
+        # top_k is explicit: this proves authorization scope, overriding the
+        # small default (2) to fit its own 3-remark fixture.
         superuser = User.objects.create_superuser(email="root@example.com", name="Root", password="x")
         results = get_semantically_relevant_remarks(
-            superuser, "everything", embedding_service=self.query_service,
+            superuser, "everything", top_k=10, embedding_service=self.query_service,
         )
         ids = {r["remark_id"] for r in results}
         self.assertEqual(ids, {self.private_remark.id, self.visible_remark.id, self.other_teacher_remark.id})
 
-    # ── THE critical security test ──────────────────────────────────────
-
     def test_unauthorized_but_more_similar_remark_is_never_returned(self):
-        # other_teacher_remark's embedding (angle 10) is far more similar
-        # to the query (angle 0) than visible_remark's embedding (angle 30)
-        # is. If authorization were applied AFTER a broad similarity
-        # search, other_teacher_remark would rank first. It must never
-        # appear at all for student_57, regardless of similarity.
+        # other_teacher_remark's embedding (angle 10) is far more similar to
+        # the query than visible_remark's (angle 30). If authorization were
+        # applied after a broad similarity search, it would rank first - it
+        # must never appear at all for student_57.
         results = get_semantically_relevant_remarks(
             self.student_57.user, "routing feedback", embedding_service=self.query_service,
         )
@@ -215,14 +203,10 @@ class SemanticRemarksRetrievalTests(TestCase):
         self.assertNotIn(self.other_teacher_remark.id, ids)
         self.assertEqual(ids, [self.visible_remark.id])
 
-    # ── Ordering ─────────────────────────────────────────────────────────
-
     def test_results_ordered_by_distance_most_similar_first(self):
         results = get_semantically_relevant_remarks(
             self.teacher_a.user, "performance", embedding_service=self.query_service,
         )
-        # visible_remark (angle 30) is closer to the query (angle 0) than
-        # private_remark (angle 60).
         self.assertEqual([r["remark_id"] for r in results], [self.visible_remark.id, self.private_remark.id])
         self.assertLess(results[0]["distance"], results[1]["distance"])
 
@@ -232,8 +216,6 @@ class SemanticRemarksRetrievalTests(TestCase):
         )
         self.assertEqual(len(results), 1)
         self.assertEqual(results[0]["remark_id"], self.visible_remark.id)
-
-    # ── Missing embeddings ───────────────────────────────────────────────
 
     def test_remarks_without_embeddings_are_excluded(self):
         unembedded = Remark.objects.create(
@@ -246,8 +228,6 @@ class SemanticRemarksRetrievalTests(TestCase):
         ids = {r["remark_id"] for r in results}
         self.assertNotIn(unembedded.id, ids)
 
-    # ── Result shape ─────────────────────────────────────────────────────
-
     def test_result_shape_has_expected_keys(self):
         results = get_semantically_relevant_remarks(
             self.teacher_a.user, "performance", embedding_service=self.query_service,
@@ -258,8 +238,6 @@ class SemanticRemarksRetrievalTests(TestCase):
                 {"remark_id", "text", "teacher_name", "course_name", "visibility", "created_at", "distance"},
             )
 
-    # ── Input validation ─────────────────────────────────────────────────
-
     def test_empty_query_text_raises_value_error(self):
         with self.assertRaises(ValueError):
             get_semantically_relevant_remarks(self.teacher_a.user, "   ", embedding_service=self.query_service)
@@ -269,3 +247,44 @@ class SemanticRemarksRetrievalTests(TestCase):
             get_semantically_relevant_remarks(
                 self.teacher_a.user, "performance", top_k=0, embedding_service=self.query_service,
             )
+
+    def test_top_k_default_constant_is_small(self):
+        self.assertEqual(TOP_K, 2)
+
+    def test_default_top_k_caps_results_without_explicit_override(self):
+        results = get_semantically_relevant_remarks(
+            self.teacher_a.user, "performance", embedding_service=self.query_service,
+        )
+        self.assertLessEqual(len(results), TOP_K)
+
+    def test_remark_beyond_similarity_threshold_is_excluded(self):
+        # A remark embedded at 150 degrees from the query has cosine distance
+        # 1 - cos(150 deg) ~= 1.866, far past the threshold.
+        far_remark = Remark.objects.create(
+            student=self.student_57, teacher=self.teacher_a, course_offering=self.offering_a,
+            remark_text="Completely unrelated topic.", visibility=Remark.Visibility.STUDENT_VISIBLE,
+        )
+        RemarkEmbedding.objects.create(
+            remark=far_remark, embedding=_vector(150), embedded_text=far_remark.remark_text,
+        )
+
+        results = get_semantically_relevant_remarks(
+            self.student_57.user, "how am I doing", top_k=10, embedding_service=self.query_service,
+        )
+
+        ids = {r["remark_id"] for r in results}
+        self.assertNotIn(far_remark.id, ids)
+        self.assertEqual(ids, {self.visible_remark.id})
+
+    def test_all_results_beyond_threshold_returns_empty_list(self):
+        RemarkEmbedding.objects.filter(remark=self.visible_remark).update(embedding=_vector(179))
+
+        results = get_semantically_relevant_remarks(
+            self.student_57.user, "how am I doing", embedding_service=self.query_service,
+        )
+
+        self.assertEqual(results, [])
+
+    def test_threshold_constant_is_conservative_not_zero(self):
+        self.assertGreater(SIMILARITY_DISTANCE_THRESHOLD, 0)
+        self.assertLess(SIMILARITY_DISTANCE_THRESHOLD, 2)

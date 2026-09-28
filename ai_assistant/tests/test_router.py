@@ -1,7 +1,6 @@
 """
-Phase 10B/10C tests: the deterministic question router.
-
-Pure function, no DB, no network - SimpleTestCase proves that structurally.
+Tests for the deterministic question router. Pure function, no DB, no
+network - SimpleTestCase proves that structurally.
 """
 from django.test import SimpleTestCase
 
@@ -48,15 +47,11 @@ class RouterTests(SimpleTestCase):
         )
 
     def test_class_alone_does_not_trigger_attendance(self):
-        # "class" is deliberately NOT an attendance keyword - a teacher
-        # asking about "my class" (their students in general) must not be
-        # misrouted away from remarks just because "class" appears.
+        # "class" is deliberately not an attendance keyword.
         self.assertEqual(
             route("What feedback have I given my class?"),
             {"remarks": True, "attendance": False, "assignments": False, "courses": False},
         )
-
-    # ── Phase 10C: assignments ──────────────────────────────────────────
 
     def test_assignment_question_routes_to_assignments_only(self):
         self.assertEqual(
@@ -97,8 +92,6 @@ class RouterTests(SimpleTestCase):
             route("What assignments do I have?"), {"remarks": False, "attendance": False, "assignments": True, "courses": False},
         )
 
-    # ── Phase 10D: courses ───────────────────────────────────────────────
-
     def test_who_teaches_me_routes_to_courses_only(self):
         self.assertEqual(
             route("Who teaches me?"), {"remarks": False, "attendance": False, "assignments": False, "courses": True},
@@ -123,9 +116,7 @@ class RouterTests(SimpleTestCase):
         )
 
     def test_teacher_feedback_question_does_not_trigger_courses(self):
-        # The critical false-positive-avoidance case: bare "teacher" must
-        # NOT be a course keyword, or this remarks-only question would be
-        # wrongly routed toward courses too.
+        # Bare "teacher" must not be a course keyword.
         self.assertEqual(
             route("What did my teacher say about my performance?"),
             {"remarks": True, "attendance": False, "assignments": False, "courses": False},
@@ -141,4 +132,27 @@ class RouterTests(SimpleTestCase):
         self.assertEqual(
             route("What courses am I taking and how is my attendance?"),
             {"remarks": False, "attendance": True, "assignments": False, "courses": True},
+        )
+
+    def test_calculate_gpa_does_not_falsely_match_late(self):
+        self.assertEqual(
+            route("Calculate my GPA"), {"remarks": False, "attendance": False, "assignments": False, "courses": False},
+        )
+
+    def test_translate_does_not_falsely_match_late(self):
+        self.assertEqual(
+            route("Can you translate this?"),
+            {"remarks": False, "attendance": False, "assignments": False, "courses": False},
+        )
+
+    def test_permission_does_not_falsely_match_miss(self):
+        self.assertEqual(
+            route("Any permission issues?"),
+            {"remarks": False, "attendance": False, "assignments": False, "courses": False},
+        )
+
+    def test_late_as_a_real_word_still_matches_attendance(self):
+        self.assertEqual(
+            route("Was I marked late today?"),
+            {"remarks": False, "attendance": True, "assignments": False, "courses": False},
         )

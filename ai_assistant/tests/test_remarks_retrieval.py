@@ -1,11 +1,8 @@
 """
-Phase 2 tests: the remarks retrieval shaping layer.
-
-Phase 1 (test_scope.py) already proved get_remarks_queryset_for_user scopes
-correctly. These tests do NOT re-verify that boundary from scratch - they
-check the narrower thing Phase 2 actually adds: that shaping the authorized
-queryset into a context list introduces no leak, and that the output shape/
-ordering/limit contract holds.
+Tests for the remarks retrieval shaping layer. test_scope.py already proves
+get_remarks_queryset_for_user scopes correctly; these tests check the
+narrower thing this layer adds - that shaping into a context list introduces
+no leak, and that the output shape/ordering/limit contract holds.
 """
 from datetime import date
 
@@ -83,8 +80,6 @@ class RemarkContextRetrievalTests(TestCase):
             remark_text="Improved significantly.", visibility=Remark.Visibility.STUDENT_VISIBLE,
         )
 
-    # ── Leak check: output ids must be a subset of the authorized queryset ─
-
     def test_student_context_contains_only_authorized_remark_ids(self):
         context = get_remark_context_for_user(self.student_57.user)
         authorized_ids = set(get_remarks_queryset_for_user(self.student_57.user).values_list("id", flat=True))
@@ -111,12 +106,9 @@ class RemarkContextRetrievalTests(TestCase):
         self.assertEqual(context, [])
 
     def test_unauthorized_student_id_probe_returns_empty_context(self):
-        # Mirrors Phase 1's anti-enumeration test, through the new function:
         # teacher_a has no relationship to student_80.
         context = get_remark_context_for_user(self.teacher_a.user, student_id=self.student_80.id)
         self.assertEqual(context, [])
-
-    # ── Shape / ordering / limit contract ───────────────────────────────
 
     def test_context_shape_has_expected_keys(self):
         context = get_remark_context_for_user(self.teacher_a.user)
@@ -138,8 +130,6 @@ class RemarkContextRetrievalTests(TestCase):
             )
         context = get_remark_context_for_user(self.teacher_a.user, limit=3)
         self.assertEqual(len(context), 3)
-
-    # ── Anonymous ────────────────────────────────────────────────────────
 
     def test_anonymous_user_gets_empty_context(self):
         context = get_remark_context_for_user(AnonymousUser())

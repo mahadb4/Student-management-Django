@@ -1,15 +1,7 @@
 """
-Development-only diagnostic: lists the Gemini model names actually
-accessible to the configured GEMINI_API_KEY/project via client.models.list()
-- the SDK's own model-listing capability, never a generate_content() call
-(no generation quota is spent running this command).
-
-Not wired into any URL/API - this is a `manage.py` command only, run
-manually by a developer/operator to check whether the models named in
-GEMINI_PRIMARY_MODEL/GEMINI_FALLBACK_MODELS (and the GEMINI_ASSIGNMENT_*
-equivalents) are actually available before adding them to a fallback
-chain. Never exposes anything to the frontend or any authenticated
-student/teacher-facing endpoint.
+Development-only diagnostic: lists Gemini model names accessible to the
+configured API key via client.models.list() (no generation quota spent).
+Not wired into any URL/API - manage.py command only.
 
 Usage:
     python manage.py list_gemini_models
@@ -40,9 +32,7 @@ class Command(BaseCommand):
 
         available = []
         for model in client.models.list():
-            # `model.name` is normally "models/<id>" - normalize to the
-            # bare id, matching how GEMINI_PRIMARY_MODEL/GEMINI_FALLBACK_
-            # MODELS are configured (e.g. "gemini-2.5-flash").
+            # Normalize "models/<id>" to the bare id.
             name = (model.name or "").split("/")[-1]
             supports_generate_content = bool(
                 getattr(model, "supported_actions", None)

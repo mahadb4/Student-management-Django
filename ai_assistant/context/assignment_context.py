@@ -1,28 +1,16 @@
 """
-Phase 10C: structured Assignments context - the second "SQL side" source
-of the hybrid assistant, alongside Attendance (Phase 10B). Assignments are
-relational/countable data, never embedded or semantically searched.
+Structured Assignments context. Assignments are relational/countable data,
+never embedded or semantically searched. Authorization is delegated to
+assignments.authorization.get_assignments_queryset_for_user.
 
-This module performs no authorization of its own beyond calling the
-existing assignments.authorization.get_assignments_queryset_for_user -
-the exact same function the real /api/assignments/ endpoint uses.
-
-Student-focused only, per Phase 10C scope: a caller with no student_profile
-(a teacher, or anyone else) gets a safe "not available" response rather
-than any teacher-side assignment analytics - that's explicitly deferred,
-not silently built here.
-
-Status is derived, never stored, from two real fields:
+Status is derived, never stored:
     submitted -> a Submission row exists for this student+assignment
-    overdue   -> no submission AND due_at is in the past
-    pending   -> no submission AND due_at is still in the future
-"submitted" never implies graded/reviewed - no such field exists anywhere
-in this schema, and this module never claims otherwise.
+    overdue   -> no submission and due_at is in the past
+    pending   -> no submission and due_at is still in the future
+"submitted" never implies graded/reviewed - no such field exists in this schema.
 
-Attachment content is never read, extracted, or sent anywhere - only
-whether attachment_key is set (a plain presence/absence boolean) is
-surfaced, matching the project's confirmed lack of any text-extraction
-pipeline for S3 attachments.
+Attachment content is never read or extracted - only whether attachment_key
+is set is surfaced.
 """
 from django.utils import timezone
 
@@ -33,18 +21,15 @@ def build_assignment_context(user, course_offering_id=None):
     """
     Returns:
         {
-            "prompt_item": {...},  # Option A compatibility wrapper for
-                                    # GeminiGenerationService's existing
-                                    # item shape (Phase 7, unchanged).
+            "prompt_item": {...},  # compatibility wrapper for
+                                    # GeminiGenerationService's item shape.
             "sources": [...],      # {"type": "assignment", "title",
                                     # "course_name", "due_at", "status",
                                     # "attachment_available"} per assignment.
         }
 
-    `course_offering_id` (Phase 10E), if given, is threaded straight into
-    get_assignments_queryset_for_user's own existing parameter - that
-    function already supported this narrowing; it was simply unused here
-    until now. No authorization logic changes.
+    `course_offering_id`, if given, is threaded into
+    get_assignments_queryset_for_user's own existing parameter.
     """
     student = getattr(user, "student_profile", None)
     if not student:

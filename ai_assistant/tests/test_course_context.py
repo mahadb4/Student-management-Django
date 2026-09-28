@@ -1,11 +1,8 @@
 """
-Phase 10D tests: build_course_context.
-
-Authorization is entirely delegated to common.permissions.apply_data_scope
-("enrollment") - the same function Attendance (10B) already reuses. These
-tests focus on: the ACTIVE-only scope decision, using CourseOffering.teacher
-(not Course.teacher), and re-confirming cross-student isolation through
-this new entry point.
+Tests for build_course_context. Authorization is entirely delegated to
+common.permissions.apply_data_scope. These tests focus on the ACTIVE-only
+scope decision, using CourseOffering.teacher (not Course.teacher), and
+cross-student isolation.
 """
 from datetime import date
 
@@ -32,7 +29,7 @@ class CourseContextTests(TestCase):
         )
 
         # Course.teacher deliberately differs from CourseOffering.teacher -
-        # proves the context uses the offering's teacher, not the course's.
+        # proves the context uses the offering's teacher.
         stale_teacher_user = User.objects.create_user(
             email="stale@example.com", name="Stale Course Teacher", password="x", role="teacher",
         )
@@ -63,7 +60,7 @@ class CourseContextTests(TestCase):
 
         self.course = Course.objects.create(
             name="Database Systems", code="CS301", credits=3, department=self.department,
-            teacher=self.stale_course_teacher,  # deliberately the "wrong" teacher
+            teacher=self.stale_course_teacher,
         )
         self.offering = CourseOffering.objects.create(
             course=self.course, teacher=self.offering_teacher, semester=CourseOffering.Semester.FALL,

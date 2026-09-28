@@ -4,36 +4,15 @@ from google.genai import types
 
 from common.ai.model_router import AllModelsExhaustedError, GeminiModelRouter, build_model_chain
 
-# gemini-2.5-flash: stable, generally-available Gemini text generation
-# model. Originally implemented with gemini-3.8-flash (also GA per docs,
-# confirmed valid via client.models.get() - "models/gemini-3.8-flash"),
-# but real production calls consistently failed with a live
-# "503 UNAVAILABLE - This model is currently experiencing high demand"
-# error from Google's own API (reproduced directly against the API,
-# independent of this project's code, on 2026-09-14 - see the Remarks-
-# assistant-503 debugging session). gemini-3.8-flash had been GA for
-# only ~12 days at that point; gemini-2.5-flash is a longer-established
-# GA release and succeeded immediately in the same reproduction. Pinned
-# to an explicit version rather than an alias like "gemini-flash-latest"
-# so this service's behavior doesn't silently change under a future
-# release - revisit this pin if gemini-3.8-flash's demand issues resolve.
-#
-# This remains the code-level default primary model (and the value the
-# gemini-3.8-flash regression test below still pins against). The actual
-# primary/fallback chain used at request time is resolved from
-# settings.GEMINI_PRIMARY_MODEL / GEMINI_FALLBACK_MODELS (see
-# common.ai.model_router) - when those settings are left at their
-# defaults, the chain starts with this exact model, so behavior is
-# unchanged unless a fallback chain is explicitly configured.
+# Pinned to gemini-2.5-flash rather than gemini-3.8-flash: the latter returned
+# live "503 UNAVAILABLE" errors from Google's API in production, so pin to an
+# explicit, longer-established GA version instead of a "latest" alias.
 GENERATION_MODEL = "gemini-2.5-flash"
 
-# No tokenizer is used anywhere in this project (see Phase 6's context
-# builder) - a simple character cap on the question is a deterministic,
-# dependency-free guard against unbounded input, not a precise token limit.
+# No tokenizer is used anywhere in this project; a character cap is a
+# deterministic, dependency-free guard against unbounded input.
 MAX_QUESTION_LENGTH = 2000
 
-# Deterministic-leaning generation: this is meant to answer strictly from
-# supplied context, not to be creative.
 GENERATION_TEMPERATURE = 0.2
 
 SYSTEM_INSTRUCTION = """You are the EduPortal Student Academic Assistant. You answer a \
@@ -104,24 +83,14 @@ def _build_user_prompt(question, context_items):
 
 class GeminiGenerationService:
     """
-    Thin, provider-specific wrapper around the google-genai SDK for
-    grounded answer generation. Not a generic multi-provider abstraction -
-    matches the style of GeminiEmbeddingService (Phase 4).
-
-    This service performs no authorization, no database access, and no
-    retrieval of its own. It only ever sees the `context` dict already
-    produced by ai_assistant.context.remark_context.build_remark_context
-    (Phase 6) - itself built only from Phase 5's already-authorized
-    retrieval results. There is nothing for this service to re-check.
+    Thin, provider-specific wrapper around the google-genai SDK for grounded
+    answer generation. Performs no authorization, database access, or
+    retrieval of its own.
     """
 
     def __init__(self, client=None, model_chain=None):
         self.client = client or genai.Client(api_key=settings.GEMINI_API_KEY)
-        # Resolved at construction time (not at module import) so it
-        # reflects current settings - primary/fallback come from
-        # settings.GEMINI_PRIMARY_MODEL / GEMINI_FALLBACK_MODELS, falling
-        # back to this module's own historically-pinned GENERATION_MODEL
-        # if those settings are unset.
+        # Resolved at construction time so it reflects current settings.
         self.model_chain = model_chain or build_model_chain(
             getattr(settings, "GEMINI_PRIMARY_MODEL", None) or GENERATION_MODEL,
             getattr(settings, "GEMINI_FALLBACK_MODELS", ""),
@@ -132,17 +101,9 @@ class GeminiGenerationService:
         """
         Returns the generated answer as a plain string.
 
-        `context` must be the dict shape produced by build_remark_context:
-        {"items": [...], "sources": [...], "truncated": bool}. Only
-        `context["items"]` is ever sent to Gemini - `sources` (which
-        carries remark_id) is never sent, so the model has no way to see,
-        echo, or invent a source ID. Callers are responsible for combining
-        this returned answer with context["sources"] afterward - this
-        service does not do that itself.
-
-        If `context["items"]` is empty, returns a safe fixed message
-        WITHOUT calling Gemini at all - there's nothing to ground an
-        answer in, so no API call is made and nothing is hallucinated.
+        `context` must be {"items": [...], "sources": [...], "truncated": bool}.
+        Only `context["items"]` is ever sent to Gemini - `sources` (which
+        carries remark_id) is never sent, so the model can't invent a source ID.
         """
         if not isinstance(question, str) or not question.strip():
             raise ValueError("question must be a non-empty string.")
@@ -167,9 +128,7 @@ class GeminiGenerationService:
                 ),
             )
         except AllModelsExhaustedError as e:
-            # Same student-facing failure mode as before (AnswerGenerationError,
-            # translated by the API layer into a generic "unavailable" 503) -
-            # the student is never told which/how many models were tried.
+            # The student is never told which/how many models were tried.
             raise AnswerGenerationError("Gemini generation is temporarily unavailable.") from e
         except Exception as e:
             raise AnswerGenerationError(f"Gemini generation request failed: {type(e).__name__}") from e

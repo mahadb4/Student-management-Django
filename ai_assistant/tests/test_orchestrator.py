@@ -1,13 +1,9 @@
 """
-Phase 10B tests: the orchestrator's domain-selection behavior.
-
-These tests mock every downstream dependency (retrieval, both context
-builders, generation) so they can run as SimpleTestCase - no database
-involved. That's deliberate: the point of this file is proving the
-ORCHESTRATION logic itself (which functions get called, with what,
-combined how) is correct, independent of what any one domain's real
-authorization does (that's covered separately: Phase 1/5 for remarks,
-test_attendance_context.py for attendance).
+Tests for the orchestrator's domain-selection behavior. These mock every
+downstream dependency so they can run as SimpleTestCase - no database
+involved. The point is proving the orchestration logic itself (which
+functions get called, with what, combined how) is correct, independent of
+what any one domain's real authorization does.
 """
 from unittest.mock import patch
 
@@ -24,7 +20,7 @@ from ai_assistant.orchestrator import (
 class OrchestratorTests(SimpleTestCase):
 
     def setUp(self):
-        self.user = AnonymousUser()  # identity is irrelevant here - every call is mocked
+        self.user = AnonymousUser()
 
     @patch("ai_assistant.orchestrator.build_attendance_context")
     @patch("ai_assistant.orchestrator.GeminiGenerationService")
@@ -129,8 +125,6 @@ class OrchestratorTests(SimpleTestCase):
         mock_gen_cls.assert_not_called()
         self.assertEqual(result, {"answer": NOT_ENOUGH_INFORMATION_MESSAGE, "sources": []})
 
-    # ── Phase 10C: assignments ──────────────────────────────────────────
-
     @patch("ai_assistant.orchestrator.build_assignment_context")
     @patch("ai_assistant.orchestrator.build_attendance_context")
     @patch("ai_assistant.orchestrator.GeminiGenerationService")
@@ -208,8 +202,6 @@ class OrchestratorTests(SimpleTestCase):
         sent_context = mock_gen_cls.return_value.generate_answer.call_args[0][1]
         self.assertEqual(len(sent_context["items"]), 3)
 
-    # ── Phase 10D: courses ───────────────────────────────────────────────
-
     @patch("ai_assistant.orchestrator.build_course_context")
     @patch("ai_assistant.orchestrator.build_assignment_context")
     @patch("ai_assistant.orchestrator.build_attendance_context")
@@ -257,8 +249,6 @@ class OrchestratorTests(SimpleTestCase):
         }
         mock_gen_cls.return_value.generate_answer.return_value = "Focus on SQL."
 
-        # Critical false-positive-avoidance case (bare "teacher" is not a
-        # course keyword) verified at the orchestration level too.
         answer_academic_question(self.user, "What did my teacher say about my performance?")
 
         mock_build_course_ctx.assert_not_called()
@@ -302,8 +292,6 @@ class OrchestratorTests(SimpleTestCase):
         self.assertEqual(types, {"remark", "attendance", "assignment", "course"})
         sent_context = mock_gen_cls.return_value.generate_answer.call_args[0][1]
         self.assertEqual(len(sent_context["items"]), 4)
-
-    # ── Phase 10E: overall trigger ───────────────────────────────────────
 
     def _mock_all_four(self, mock_retrieve, mock_build_remark_ctx, mock_build_attendance_ctx,
                         mock_build_assignment_ctx, mock_build_course_ctx, mock_gen_cls):
@@ -398,8 +386,6 @@ class OrchestratorTests(SimpleTestCase):
         mock_build_assignment_ctx.assert_not_called()
         mock_retrieve.assert_not_called()
 
-    # ── Phase 10E: course-specific narrowing ────────────────────────────
-
     @patch("ai_assistant.orchestrator.resolve_mentioned_course")
     @patch("ai_assistant.orchestrator.build_course_context")
     @patch("ai_assistant.orchestrator.build_assignment_context")
@@ -451,7 +437,7 @@ class OrchestratorTests(SimpleTestCase):
         answer_academic_question(self.user, "What assignments do I have for Maths?")
 
         # assignments keyword already routed - stays assignments-only, but
-        # still narrowed by the resolved course.
+        # narrowed by the resolved course.
         mock_build_attendance_ctx.assert_not_called()
         mock_build_course_ctx.assert_not_called()
         mock_retrieve.assert_not_called()
@@ -528,17 +514,140 @@ class OrchestratorTests(SimpleTestCase):
 
         result = answer_academic_question(self.user, "What are my weaknesses in general?")
 
+
         mock_gen_cls.return_value.generate_answer.assert_called_once()
         self.assertEqual(result["answer"], "Focus on SQL.")
 
 
+class OrchestratorCourseRecommendationTests(SimpleTestCase):
+    """
+    A future-course-recommendation question must short-circuit to a grounded
+    limitation message without querying enrollments, resolving a course, or
+    calling Gemini at all - there is no course-catalog/roadmap data in this schema.
+    """
+
+    def setUp(self):
+        self.user = AnonymousUser()
+
+    @patch("ai_assistant.orchestrator.resolve_mentioned_course")
+    @patch("ai_assistant.orchestrator.build_course_context")
+    @patch("ai_assistant.orchestrator.GeminiGenerationService")
+    def test_future_course_recommendation_returns_grounded_message_without_retrieval_or_gemini(
+        self, mock_gen_cls, mock_build_course_ctx, mock_resolve_course,
+    ):
+        result = answer_academic_question(self.user, "What courses will you recommend me in future?")
+
+        mock_resolve_course.assert_not_called()
+        mock_build_course_ctx.assert_not_called()
+        mock_gen_cls.assert_not_called()
+        self.assertEqual(result["sources"], [])
+        self.assertIn("advisor", result["answer"].lower())
+
+    @patch("ai_assistant.orchestrator.resolve_mentioned_course")
+    @patch("ai_assistant.orchestrator.build_course_context")
+    @patch("ai_assistant.orchestrator.GeminiGenerationService")
+    def test_should_i_take_next_semester_also_carved_out(
+        self, mock_gen_cls, mock_build_course_ctx, mock_resolve_course,
+    ):
+        result = answer_academic_question(self.user, "What courses should I take next semester?")
+
+        mock_build_course_ctx.assert_not_called()
+        mock_gen_cls.assert_not_called()
+        self.assertEqual(result["sources"], [])
+
+    @patch("ai_assistant.orchestrator.build_course_context")
+    @patch("ai_assistant.orchestrator.GeminiGenerationService")
+    def test_plain_course_list_question_is_unaffected(self, mock_gen_cls, mock_build_course_ctx):
+        mock_build_course_ctx.return_value = {
+            "prompt_item": {"teacher_name": "Courses Summary", "course_name": "Overall", "created_at": "", "text": "..."},
+            "sources": [{"type": "course", "course_name": "Databases", "course_code": "CS101",
+                          "teacher_name": "T", "section_name": "A"}],
+        }
+        mock_gen_cls.return_value.generate_answer.return_value = "You are taking Databases."
+
+        result = answer_academic_question(self.user, "Which subjects am I having?")
+
+        mock_build_course_ctx.assert_called_once()
+        self.assertEqual(result["answer"], "You are taking Databases.")
+        self.assertEqual(len(result["sources"]), 1)
+
+
+class OrchestratorCourseListVsRecommendationIOTests(SimpleTestCase):
+    """Proves only the retriever actually required by the classified intent is ever called."""
+
+    def setUp(self):
+        self.user = AnonymousUser()
+
+    @patch("ai_assistant.orchestrator.build_course_context")
+    @patch("ai_assistant.orchestrator.build_attendance_context")
+    @patch("ai_assistant.orchestrator.build_assignment_context")
+    @patch("ai_assistant.orchestrator.GeminiGenerationService")
+    @patch("ai_assistant.orchestrator.build_remark_context")
+    @patch("ai_assistant.orchestrator.get_semantically_relevant_remarks")
+    def test_course_question_calls_only_course_repository(
+        self, mock_retrieve, mock_build_remark_ctx, mock_gen_cls,
+        mock_build_assignment_ctx, mock_build_attendance_ctx, mock_build_course_ctx,
+    ):
+        mock_build_course_ctx.return_value = {
+            "prompt_item": {"teacher_name": "Courses Summary", "course_name": "Overall", "created_at": "", "text": "..."},
+            "sources": [],
+        }
+        mock_gen_cls.return_value.generate_answer.return_value = "..."
+
+        answer_academic_question(self.user, "What are my current courses?")
+
+        mock_build_course_ctx.assert_called_once()
+        mock_retrieve.assert_not_called()
+        mock_build_attendance_ctx.assert_not_called()
+        mock_build_assignment_ctx.assert_not_called()
+
+    @patch("ai_assistant.orchestrator.build_course_context")
+    @patch("ai_assistant.orchestrator.build_attendance_context")
+    @patch("ai_assistant.orchestrator.GeminiGenerationService")
+    @patch("ai_assistant.orchestrator.build_remark_context")
+    @patch("ai_assistant.orchestrator.get_semantically_relevant_remarks")
+    def test_teacher_feedback_question_calls_only_vector_repository(
+        self, mock_retrieve, mock_build_remark_ctx, mock_gen_cls,
+        mock_build_attendance_ctx, mock_build_course_ctx,
+    ):
+        mock_retrieve.return_value = [{"remark_id": 1}]
+        mock_build_remark_ctx.return_value = {
+            "items": [{"teacher_name": "T", "course_name": "C", "created_at": "2026-01-01", "text": "Struggling."}],
+            "sources": [{"remark_id": 1, "teacher_name": "T", "course_name": "C", "created_at": "2026-01-01"}],
+            "truncated": False,
+        }
+        mock_gen_cls.return_value.generate_answer.return_value = "..."
+
+        answer_academic_question(self.user, "What did my teacher say about my performance?")
+
+        mock_retrieve.assert_called_once()
+        mock_build_course_ctx.assert_not_called()
+        mock_build_attendance_ctx.assert_not_called()
+
+    @patch("ai_assistant.orchestrator.build_course_context")
+    @patch("ai_assistant.orchestrator.build_assignment_context")
+    @patch("ai_assistant.orchestrator.GeminiGenerationService")
+    @patch("ai_assistant.orchestrator.build_remark_context")
+    @patch("ai_assistant.orchestrator.get_semantically_relevant_remarks")
+    def test_unsupported_question_calls_no_academic_retriever_at_all(
+        self, mock_retrieve, mock_build_remark_ctx, mock_gen_cls,
+        mock_build_assignment_ctx, mock_build_course_ctx,
+    ):
+        result = answer_academic_question(self.user, "Tell me the weather tomorrow.")
+
+        mock_retrieve.assert_not_called()
+        mock_build_assignment_ctx.assert_not_called()
+        mock_build_course_ctx.assert_not_called()
+        mock_gen_cls.assert_not_called()
+        self.assertEqual(result["sources"], [])
+
+
 class OrchestratorCasualIntentTests(SimpleTestCase):
     """
-    The casual layer (ai_assistant.casual_intent) is checked FIRST, before
-    routing/course resolution/retrieval/Gemini - these tests prove that
-    short-circuit actually happens at the orchestrator level, and that it
-    does NOT fire for a message that merely contains a greeting word
-    alongside real academic content.
+    The casual layer is checked first, before routing/course resolution/
+    retrieval/Gemini - these tests prove that short-circuit happens at the
+    orchestrator level, and does not fire for a message that merely contains
+    a greeting word alongside real academic content.
     """
 
     def setUp(self):
@@ -577,8 +686,6 @@ class OrchestratorCasualIntentTests(SimpleTestCase):
         mock_route.assert_not_called()
         mock_gen_cls.assert_not_called()
         self.assertTrue(result["answer"].startswith("See you later"))
-
-    # ── Ambiguous cases: greeting word + real academic content must still route normally ──
 
     @patch("ai_assistant.orchestrator.build_attendance_context")
     @patch("ai_assistant.orchestrator.GeminiGenerationService")
