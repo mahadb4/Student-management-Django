@@ -16,9 +16,11 @@ from ai_assistant.router import route
 from ai_assistant.services.gemini_generation_service import GeminiGenerationService
 
 NO_RELEVANT_DOMAIN_MESSAGE = (
-    "I can help with your courses, attendance, assignments, or feedback from your teachers. "
-    "What would you like to know?"
+    "I'm mainly here to help with your academic information, like your courses, attendance, assignments, "
+    "and teacher feedback. I don't have anything on that topic, but feel free to ask me something about "
+    "your studies."
 )
+
 NOT_ENOUGH_INFORMATION_MESSAGE = "There is not enough information available to answer this question."
 
 # Recognized intents the system has no data source for at all, distinct from
@@ -32,13 +34,46 @@ _UNSUPPORTED_INTENT_MESSAGES = {
     ),
 }
 _DEFAULT_UNSUPPORTED_CAPABILITY_MESSAGE = (
-    "I don't currently have the information needed to answer that from your academic records. "
-    "I can help with your courses, attendance, assignments, or feedback from your teachers."
+    "I'm mainly here to help with your academic information, like your courses, attendance, assignments, "
+    "and teacher feedback. I don't have anything on that topic, but feel free to ask me something about "
+    "your studies."
+)
+
+# Domain-specific FUTURE_PREDICTION replies, so a question about future feedback
+# talks about feedback rather than reciting all four domains every time. Falls
+# back to a general reply when the question doesn't clearly point at one domain.
+_FUTURE_PREDICTION_MESSAGES = {
+    frozenset({"remarks"}): (
+        "I can help you understand the feedback you've received from your teachers so far, but I can't know "
+        "what feedback you'll receive in the future. I can show you your recent feedback and help you see "
+        "what you may need to work on."
+    ),
+    frozenset({"attendance"}): (
+        "I can show you your attendance record so far, but I can't predict what your attendance will look "
+        "like going forward. I can walk you through what you've got on record right now if that helps."
+    ),
+    frozenset({"assignments"}): (
+        "I can show you the assignments you currently have, but I don't know what assignments a teacher "
+        "will give you later on. I can show you what's due right now if that's useful."
+    ),
+    frozenset({"courses"}): (
+        "I can tell you about the courses you're currently taking, but I can't predict a future grade or "
+        "outcome in them. I can walk you through how things stand right now."
+    ),
+}
+_DEFAULT_FUTURE_PREDICTION_MESSAGE = (
+    "I can help you understand your current courses, attendance, assignments, and teacher feedback, but I "
+    "can't predict what's coming next, like a future grade or upcoming feedback. I can show you what's on "
+    "record right now if that helps."
 )
 
 
 def _unsupported_capability_message(intent):
     return _UNSUPPORTED_INTENT_MESSAGES.get(intent, _DEFAULT_UNSUPPORTED_CAPABILITY_MESSAGE)
+
+
+def _future_prediction_message(domains):
+    return _FUTURE_PREDICTION_MESSAGES.get(domains, _DEFAULT_FUTURE_PREDICTION_MESSAGE)
 
 # When any of these phrases appear, all four domains are activated regardless
 # of which specific domain keywords also matched.
@@ -73,6 +108,8 @@ def answer_academic_question(user, question, *, embedding_service=None, generati
     # Recognized-but-structurally-unsupported intents are caught before course
     # resolution/retrieval run, since no data source exists for them.
     intent_result = classify_intent(question, is_overall=overall)
+    if intent_result.intent is Intent.FUTURE_PREDICTION:
+        return {"answer": _future_prediction_message(intent_result.domains), "sources": []}
     if intent_result.retrieval_strategy is RetrievalStrategy.UNSUPPORTED and intent_result.intent != Intent.UNSUPPORTED:
         return {"answer": _unsupported_capability_message(intent_result.intent), "sources": []}
 

@@ -7,10 +7,8 @@ request.user (resolved from the JWT) is the only source of identity; the
 request body never specifies who the requester is.
 """
 import json
-
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
-
 from ai_assistant.orchestrator import answer_academic_question
 from ai_assistant.services.gemini_embedding_service import EmbeddingGenerationError
 from ai_assistant.services.gemini_generation_service import AnswerGenerationError
@@ -19,7 +17,6 @@ from common.messages import Messages
 # Mirrors GeminiGenerationService.MAX_QUESTION_LENGTH, validated here first so
 # an over-length question is rejected before any routing/retrieval call.
 MAX_QUESTION_LENGTH = 2000
-
 
 @csrf_exempt
 def ask_api(request):
