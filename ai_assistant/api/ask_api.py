@@ -31,10 +31,10 @@ def ask_api(request):
     try:
         data = json.loads(request.body)
     except json.JSONDecodeError:
-        return JsonResponse({"error": Messages.INVALID_JSON}, status=400)
+        return JsonResponse({"error": Messages.INVALID_JSON}, status = 400)
 
     if not isinstance(data, dict):
-        return JsonResponse({"error": Messages.REQUEST_BODY_MUST_BE_JSON_OBJECT}, status=400)
+        return JsonResponse({"error": Messages.REQUEST_BODY_MUST_BE_JSON_OBJECT}, status =400)
 
     # Deliberately: no student_id, teacher_id, or other identity field is
     # ever read from `data`. Only "question" is consumed from the body.

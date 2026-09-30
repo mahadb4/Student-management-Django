@@ -1,7 +1,6 @@
 from enrollments.models import Enrollment
 from remarks.models import Remark
 
-
 # An enrollment counts as "real" for remark purposes if it isn't soft-deleted
 # and the student hasn't dropped the course. A remark can still reference a
 # COMPLETED enrollment (e.g. end-of-semester feedback), just not a DROPPED one.
@@ -77,7 +76,6 @@ def get_remarks_queryset_for_user(user, student_id = None):
         )
 
     return Remark.objects.none()
-
 
 def user_can_view_remark(user, remark):
     return get_remarks_queryset_for_user(user).filter(id = remark.id).exists()

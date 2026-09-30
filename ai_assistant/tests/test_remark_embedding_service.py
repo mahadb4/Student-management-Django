@@ -82,12 +82,10 @@ class RemarkEmbeddingServiceTests(TestCase):
         obj = RemarkEmbedding.objects.get(remark=self.remark)
         self.assertEqual(list(obj.embedding), [0.125] * EMBEDDING_DIMENSIONS)
 
-    def test_embedded_text_matches_text_actually_embedded(self):
+    def test_embed_remark_sends_the_remarks_own_text(self):
         service = _FakeEmbeddingService()
         embed_remark(self.remark, embedding_service=service)
 
-        obj = RemarkEmbedding.objects.get(remark=self.remark)
-        self.assertEqual(obj.embedded_text, "Struggling with joins.")
         self.assertEqual(service.calls, ["Struggling with joins."])
 
     def test_only_remark_text_is_sent_to_the_embedding_service(self):
@@ -127,7 +125,7 @@ class RemarkEmbeddingServiceTests(TestCase):
     def test_remark_with_no_embedding_is_stale(self):
         self.assertTrue(remark_embedding_is_stale(self.remark))
 
-    def test_remark_with_matching_embedded_text_is_not_stale(self):
+    def test_remark_with_fresh_embedding_is_not_stale(self):
         embed_remark(self.remark, embedding_service=_FakeEmbeddingService())
         self.remark.refresh_from_db()
         self.assertFalse(remark_embedding_is_stale(self.remark))
@@ -135,7 +133,7 @@ class RemarkEmbeddingServiceTests(TestCase):
     def test_remark_with_changed_text_is_stale(self):
         embed_remark(self.remark, embedding_service=_FakeEmbeddingService())
         self.remark.remark_text = "Now doing much better with joins."
-        self.remark.save(update_fields=["remark_text"])
+        self.remark.save()
         self.remark.refresh_from_db()
         self.assertTrue(remark_embedding_is_stale(self.remark))
 

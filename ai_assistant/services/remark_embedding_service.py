@@ -15,17 +15,17 @@ def embed_remark(remark, embedding_service=None):
 
     obj, _created = RemarkEmbedding.objects.update_or_create(
         remark=remark,
-        defaults={"embedding": values, "embedded_text": text},
+        defaults={"embedding": values},
     )
     return obj
 
 
 def remark_embedding_is_stale(remark):
     """
-    True if the Remark has no embedding yet, or its stored embedded_text no
-    longer matches the Remark's current remark_text.
+    True if the Remark has no embedding yet, or the embedding predates the
+    Remark's last update (remark_text may have changed since it was embedded).
     """
     embedding = getattr(remark, "embedding", None)
     if embedding is None:
         return True
-    return embedding.embedded_text != remark.remark_text
+    return embedding.updated_at < remark.updated_at

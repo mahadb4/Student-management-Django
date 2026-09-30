@@ -4,6 +4,7 @@ remarks.authorization.get_remarks_queryset_for_user; this module only shapes
 the already-authorized queryset into a small, LLM-context-ready list of dicts.
 """
 from remarks.authorization import get_remarks_queryset_for_user
+from remarks.models import VISIBILITY_CODE_TO_LABEL
 
 
 def get_remark_context_for_user(user, *, student_id=None, limit=20):
@@ -20,7 +21,7 @@ def get_remark_context_for_user(user, *, student_id=None, limit=20):
             "text": remark.remark_text,
             "teacher_name": remark.teacher.user.name,
             "course_name": remark.course_offering.course.name,
-            "visibility": remark.visibility,
+            "visibility": VISIBILITY_CODE_TO_LABEL[remark.visibility],
             "created_at": remark.created_at.isoformat(),
         }
         for remark in qs

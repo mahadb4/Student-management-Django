@@ -11,7 +11,6 @@ class RemarkEmbedding(models.Model):
         "remarks.Remark", on_delete=models.CASCADE, related_name="embedding",
     )
     embedding = VectorField(dimensions=768)
-    embedded_text = models.TextField()
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

@@ -20,12 +20,7 @@ def authenticate_request(request):
         return None, JsonResponse({"error": Messages.AUTH_CREDENTIALS_NOT_PROVIDED}, status = 401)
 
     user, _ = result
-
-    # Server-side placement gate: a student whose academic placement
-    # (Department + Section) hasn't been confirmed by an admin yet must be
-    # rejected here even if a crafted request bypasses the frontend's route
-    # guard. /users/me/ and /users/onboarding/ intentionally don't use this
-    # helper, so the review page can still show identity and poll status.
+    
     if user.role == "student":
         student = _get_profile(user, "student_profile")
         if student and not student.placement_confirmed:

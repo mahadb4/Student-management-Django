@@ -162,14 +162,13 @@ class AskApiTests(TestCase):
         )
 
         RemarkEmbedding.objects.create(
-            remark=self.private_remark, embedding=_vector(60), embedded_text=self.private_remark.remark_text,
+            remark=self.private_remark, embedding=_vector(60),
         )
         RemarkEmbedding.objects.create(
-            remark=self.visible_remark, embedding=_vector(30), embedded_text=self.visible_remark.remark_text,
+            remark=self.visible_remark, embedding=_vector(30),
         )
         RemarkEmbedding.objects.create(
             remark=self.other_teacher_remark, embedding=_vector(10),
-            embedded_text=self.other_teacher_remark.remark_text,
         )
 
         now = timezone.now()
@@ -665,10 +664,10 @@ class CourseScopedNarrowingApiTests(TestCase):
             remark_text="Great progress on network protocols.", visibility=Remark.Visibility.STUDENT_VISIBLE,
         )
         RemarkEmbedding.objects.create(
-            remark=self.databases_remark, embedding=_vector(30), embedded_text=self.databases_remark.remark_text,
+            remark=self.databases_remark, embedding=_vector(30),
         )
         RemarkEmbedding.objects.create(
-            remark=self.networks_remark, embedding=_vector(10), embedded_text=self.networks_remark.remark_text,
+            remark=self.networks_remark, embedding=_vector(10),
         )
 
         Attendance.objects.create(

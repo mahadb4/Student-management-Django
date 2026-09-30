@@ -5,7 +5,7 @@ from common.decorators import enforce_permissions
 from common.messages import Messages
 from common.utils import paginate_queryset
 from remarks.authorization import get_remarks_queryset_for_user, teacher_can_access_student_in_offering
-from remarks.models import Remark
+from remarks.models import Remark, VISIBILITY_CODE_TO_LABEL, VISIBILITY_LABEL_TO_CODE
 from students.models import Student
 from course_offerings.models import CourseOffering
 
@@ -25,7 +25,7 @@ def serialize_remark_for_teacher(remark):
         "id": remark.id,
         "teacher": remark.teacher_id,
         "remark_text": remark.remark_text,
-        "visibility": remark.visibility,
+        "visibility": VISIBILITY_CODE_TO_LABEL[remark.visibility],
         "created_at": remark.created_at,
     }
 
@@ -60,10 +60,12 @@ def _get_teacher_or_error(request):
     return teacher, None
 
 
-def _validate_visibility(value):
-    valid_values = [choice[0] for choice in Remark.Visibility.choices]
-    if value not in valid_values:
-        raise ValueError(Messages.REMARK_INVALID_VISIBILITY.format(value, ", ".join(valid_values)))
+def _visibility_code_from_label(value):
+    if value not in VISIBILITY_LABEL_TO_CODE:
+        raise ValueError(
+            Messages.REMARK_INVALID_VISIBILITY.format(value, ", ".join(VISIBILITY_LABEL_TO_CODE))
+        )
+    return VISIBILITY_LABEL_TO_CODE[value]
 
 
 @csrf_exempt
@@ -107,7 +109,7 @@ def remark_api(request, remark_id = None):
             student_id = data.get("student")
             course_offering_id = data.get("course_offering")
             remark_text = (data.get("remark_text") or "").strip()
-            visibility = data.get("visibility", Remark.Visibility.PRIVATE)
+            visibility_label = data.get("visibility", VISIBILITY_CODE_TO_LABEL[Remark.Visibility.PRIVATE])
 
             if not student_id:
                 raise ValueError(Messages.REMARK_STUDENT_REQUIRED)
@@ -115,7 +117,7 @@ def remark_api(request, remark_id = None):
                 raise ValueError(Messages.REMARK_COURSE_OFFERING_REQUIRED)
             if not remark_text:
                 raise ValueError(Messages.REMARK_TEXT_REQUIRED)
-            _validate_visibility(visibility)
+            visibility = _visibility_code_from_label(visibility_label)
 
             student = Student.objects.filter(id = student_id).first()
             if not student:
@@ -171,8 +173,7 @@ def remark_api(request, remark_id = None):
                 remark.remark_text = remark_text
 
             if "visibility" in data:
-                _validate_visibility(data["visibility"])
-                remark.visibility = data["visibility"]
+                remark.visibility = _visibility_code_from_label(data["visibility"])
 
             remark.save()
             return JsonResponse(serialize_remark_for_teacher(remark))

@@ -115,14 +115,13 @@ class SemanticRemarksRetrievalTests(TestCase):
         # Query vector = angle 0; each remark's embedding is at a controlled
         # angle, so distance-from-query is exactly predictable.
         RemarkEmbedding.objects.create(
-            remark=self.private_remark, embedding=_vector(60), embedded_text=self.private_remark.remark_text,
+            remark=self.private_remark, embedding=_vector(60),
         )
         RemarkEmbedding.objects.create(
-            remark=self.visible_remark, embedding=_vector(30), embedded_text=self.visible_remark.remark_text,
+            remark=self.visible_remark, embedding=_vector(30),
         )
         RemarkEmbedding.objects.create(
             remark=self.other_teacher_remark, embedding=_vector(10),
-            embedded_text=self.other_teacher_remark.remark_text,
         )
 
         self.query_service = _FixedVectorEmbeddingService(_vector(0))
@@ -265,7 +264,7 @@ class SemanticRemarksRetrievalTests(TestCase):
             remark_text="Completely unrelated topic.", visibility=Remark.Visibility.STUDENT_VISIBLE,
         )
         RemarkEmbedding.objects.create(
-            remark=far_remark, embedding=_vector(150), embedded_text=far_remark.remark_text,
+            remark=far_remark, embedding=_vector(150),
         )
 
         results = get_semantically_relevant_remarks(

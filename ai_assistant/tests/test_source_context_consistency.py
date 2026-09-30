@@ -122,14 +122,14 @@ class SourceContextConsistencyTests(TestCase):
             remark_text="Struggling with SQL joins.", visibility=Remark.Visibility.STUDENT_VISIBLE,
         )
         RemarkEmbedding.objects.create(
-            remark=self.close_remark, embedding=_vector(20), embedded_text=self.close_remark.remark_text,
+            remark=self.close_remark, embedding=_vector(20),
         )
         self.far_remark = Remark.objects.create(
             student=self.student, teacher=self.teacher, course_offering=self.primary_offering,
             remark_text="Completely unrelated aside about the weather.", visibility=Remark.Visibility.STUDENT_VISIBLE,
         )
         RemarkEmbedding.objects.create(
-            remark=self.far_remark, embedding=_vector(170), embedded_text=self.far_remark.remark_text,
+            remark=self.far_remark, embedding=_vector(170),
         )
 
         self.private_remark = Remark.objects.create(
@@ -137,7 +137,7 @@ class SourceContextConsistencyTests(TestCase):
             remark_text="Private note about the student.", visibility=Remark.Visibility.PRIVATE,
         )
         RemarkEmbedding.objects.create(
-            remark=self.private_remark, embedding=_vector(15), embedded_text=self.private_remark.remark_text,
+            remark=self.private_remark, embedding=_vector(15),
         )
 
         _CapturingGeminiGenerationService.last_context = None
