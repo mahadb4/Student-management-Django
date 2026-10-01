@@ -8,55 +8,62 @@ from users.models import User
 from users.repositories.user_repository import UserRepository
 from users.services.user_service import UserService
 from users.services.user_validator import UserValidator
+from students.cache.student_cache import StudentCache
 from students.services.student_service import StudentService
 from students.services.student_validator import StudentValidator
 from students.repositories.student_repository import StudentRepository
+from teachers.cache.teacher_cache import TeacherCache
 from teachers.services.teacher_service import TeacherService
 from teachers.services.teacher_validator import TeacherValidator
 from teachers.repositories.teacher_repository import TeacherRepository
+from common.cache.cache_service import CacheService
 
 
 user_validator = UserValidator()
 user_repository = UserRepository()
 user_service = UserService(user_validator, user_repository)
 
-student_service = StudentService(StudentValidator(), StudentRepository())
-teacher_service = TeacherService(TeacherValidator(), TeacherRepository())
+#Onboarding creates Student/Teacher profiles through these services, so they must
+#be given the same entity caches the main APIs use - a raw CacheService has no
+#invalidate_on_write() and would fail at write time, and a separate cache instance
+#would leave the list caches stale after a profile is created.
+student_service = StudentService(StudentValidator(), StudentRepository(), StudentCache(CacheService()))
+teacher_service = TeacherService(TeacherValidator(), TeacherRepository(), TeacherCache(CacheService()))
+
+
+#Fields a student can never set for themself during onboarding, including by
+#crafting the request body - Department/Section are admin-assigned academic
+#placement, decided AFTER onboarding via the admin-only PATCH
+#/students/<id>/ path (see StudentValidator.validate() for the server-side
+#rule that placement_confirmed can only ever become True there, and only
+#once both are set). A brand-new Student is therefore always created with
+#department/section null and placement_confirmed False regardless of what
+#the student submits - that's what puts them into academic review instead
+#of the dashboard (see complete_onboarding_api's response and
+#App.tsx's ProtectedRoute on the frontend).
+STUDENT_ONBOARDING_BLOCKED_FIELDS = ("department", "section", "placement_confirmed")
 
 
 def _create_own_profile(user, profile):
-    # Onboarding profile creation: the email/role identity comes from the
-    # already-authenticated User, never from the submitted payload, so a
-    # user can only ever create and link a profile for themself.
+    # Email/role come from the authenticated User, not the payload, so a
+    # user can only create a profile for themself.
     if user.role == "student":
-        student = student_service.create({**profile, "student_email": user.email})
-        student.user = user
-        student.save(update_fields = ["user"])
-        return student
+        student_profile = {
+            key: value for key, value in profile.items()
+            if key not in STUDENT_ONBOARDING_BLOCKED_FIELDS
+        }
+        return student_service.create({**student_profile, "student_email": user.email}, user = user)
     if user.role == "teacher":
-        teacher = teacher_service.create({**profile, "email": user.email})
-        teacher.user = user
-        teacher.save(update_fields = ["user"])
-        return teacher
+        return teacher_service.create({**profile, "email": user.email}, user = user)
     return None
 
 from common.utils import paginate_queryset
+from users.mappers.user_mapper import UserMapper
 
 
-def serialize_user(user):
-    student = getattr(user, "student_profile", None)
-    teacher = getattr(user, "teacher_profile", None)
-
-    return {
-        "id": user.id,
-        "name": user.name,
-        "email": user.email,
-        "role": user.role,
-        "status": user.status,
-        "permissions": [],
-        "student_id": student.id if student else None,
-        "teacher_id": teacher.id if teacher else None,
-    }
+# Display name shown to the client (Navbar). Used at login/onboarding.
+def resolve_authenticated_display_name(user):
+    return user.name
 
 
 from common.decorators import enforce_permissions
@@ -69,10 +76,10 @@ def user_api(request, user_id = None):
         if request.method == "GET":
             if user_id is not None:
                 user = user_service.get(user_id)
-                return JsonResponse(serialize_user(user))
+                return JsonResponse(UserMapper.to_detail_dto(user))
 
             users = user_service.get_all()
-            return paginate_queryset(request, users, serialize_user)
+            return paginate_queryset(request, users, UserMapper.to_list_dto)
 
         return JsonResponse(
             {"error": Messages.METHOD_NOT_ALLOWED},
@@ -105,7 +112,7 @@ def register_api(request):
         return JsonResponse(
             {
                 "message": Messages.USER_REGISTRATION_SUCCESSFUL,
-                "user": serialize_user(user),
+                "user": UserMapper.to_detail_dto(user),
             },
             status = 201,
         )
@@ -139,9 +146,12 @@ def login_api(request):
 
         result = user_service.login(data)
 
+        user_payload = UserMapper.to_identity_dto(result["user"])
+        user_payload["name"] = resolve_authenticated_display_name(result["user"])
+
         return JsonResponse(
             {
-                "user": serialize_user(result["user"]),
+                "user": user_payload,
                 "access": result["access"],
                 "refresh": result["refresh"],
             }
@@ -178,7 +188,7 @@ def approve_user_api(request, user_id):
         return JsonResponse(
             {
                 "message": Messages.USER_APPROVED_SUCCESSFULLY,
-                "user": serialize_user(user),
+                "user": UserMapper.to_detail_dto(user),
             }
         )
 
@@ -204,7 +214,7 @@ def reject_user_api(request, user_id):
         return JsonResponse(
             {
                 "message": Messages.USER_REJECTED_SUCCESSFULLY,
-                "user": serialize_user(user),
+                "user": UserMapper.to_detail_dto(user),
             }
         )
 
@@ -260,7 +270,7 @@ def pending_users_api(request):
         )
 
     users = user_service.get_pending()
-    return paginate_queryset(request, users, serialize_user)
+    return paginate_queryset(request, users, UserMapper.to_list_dto)
 
 
 def me_api(request):
@@ -283,7 +293,7 @@ def me_api(request):
         user, _ = authentication_result
 
         return JsonResponse(
-            {"user": serialize_user(user)}
+            {"user": UserMapper.to_detail_dto(user)}
         )
 
     except Exception:
@@ -333,8 +343,11 @@ def complete_onboarding_api(request):
         with transaction.atomic():
             _create_own_profile(user, data)
 
+        user_payload = UserMapper.to_detail_dto(user)
+        user_payload["name"] = resolve_authenticated_display_name(user)
+
         return JsonResponse(
-            {"user": serialize_user(user)},
+            {"user": user_payload},
             status = 201,
         )
 

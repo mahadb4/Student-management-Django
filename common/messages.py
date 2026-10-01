@@ -85,6 +85,7 @@ class Messages:
     FORBIDDEN = "Forbidden."
     AUTHENTICATION_REQUIRED = "Authentication required."
     AUTH_CREDENTIALS_NOT_PROVIDED = "Authentication credentials were not provided."
+    ACADEMIC_PLACEMENT_PENDING = "Your academic placement is still under review. This will be available once an administrator confirms your Department and Section."
     INVALID_OR_EXPIRED_TOKEN = "Invalid or expired token."
     PERMISSION_DENIED = "Permission denied: {} required."
     ADMIN_ACCESS_REQUIRED = "Admin access required."
@@ -119,7 +120,10 @@ class Messages:
     INVALID_STUDENT = "Invalid student with ID {}."
     INVALID_ENROLLMENT = "Invalid enrollment with ID {}."
     INVALID_SEMESTER = "Invalid semester '{}'."
+    INVALID_SEMESTER_NUMBER = "Invalid semester number '{}'. Must be between 1 and 8."
     INVALID_SECTION = "Invalid section with ID {}."
+    SECTION_NOT_IN_DEPARTMENT = "Section with ID {} does not belong to department with ID {}."
+    PLACEMENT_REQUIRES_DEPARTMENT_AND_SECTION = "A student's academic placement cannot be confirmed without both a Department and a Section assigned."
 
     # ── Validation — Uniqueness ───────────────────────────────────────────────
     EMPLOYEE_ID_EXISTS = "Employee ID '{}' already exists."
@@ -153,6 +157,11 @@ class Messages:
     ENROLLMENT_SECTION_MISMATCH = "Student can only be enrolled in a course offering for their own section."
     STUDENT_INACTIVE = "Inactive student cannot be enrolled."
     COURSE_OFFERING_INACTIVE = "Inactive course offering cannot be used for enrollment."
+    COURSE_OFFERING_COURSE_INACTIVE = "Course offering's course is inactive and cannot be used for enrollment."
+    COURSE_OFFERING_TEACHER_INACTIVE = "Course offering's teacher is inactive and cannot be used for enrollment."
+    COURSE_OFFERING_SECTION_INACTIVE = "Course offering's section is inactive and cannot be used for enrollment."
+
+    COURSE_SECTION_SEMESTER_MISMATCH = "Course is designed for semester {} but the selected section is semester {}."
 
 
     ATTENDANCE_UPDATED = "Attendance updated successfully."
@@ -162,3 +171,67 @@ class Messages:
     ATTENDANCE_COURSE_OFFERING_NOT_FOUND = "Course offering not found."
     ATTENDANCE_COURSE_OFFERING_NOT_ASSIGNED = "You are not assigned to this course offering."
     ATTENDANCE_ENROLLMENT_NOT_FOUND = "Enrollment not found or is not active."
+    ATTENDANCE_BULK_PAYLOAD_INVALID = "course_offering_id, date and a non-empty records list are required."
+    ATTENDANCE_BULK_INCOMPLETE = "Attendance must include every active enrolled student for this course offering and date."
+
+    # ── Remark ────────────────────────────────────────────────────────────────
+    REMARK_CREATED = "Remark created successfully."
+    REMARK_UPDATED = "Remark updated successfully."
+    REMARK_DELETED = "Remark deleted successfully."
+    REMARK_NOT_FOUND_BY_ID = "Remark with ID {} not found."
+    REMARK_ID_REQUIRED = "Remark ID is required."
+    REMARK_TEXT_REQUIRED = "Remark text is required."
+    REMARK_STUDENT_REQUIRED = "Student is required."
+    REMARK_COURSE_OFFERING_REQUIRED = "Course offering is required."
+    REMARK_INVALID_VISIBILITY = "Invalid visibility '{}'. Must be one of: {}."
+    REMARK_TEACHER_NOT_FOUND = "Teacher profile not found for the current user."
+    REMARK_STUDENT_NOT_ENROLLED = "Student with ID {} is not enrolled in this course offering."
+    REMARK_NOT_OWNED = "You can only modify remarks you created."
+    REMARK_NOT_AUTHORIZED_FOR_STUDENT = "You are not authorized to add remarks for this student in this course offering."
+
+    # ── Assignment ────────────────────────────────────────────────────────────
+    ASSIGNMENT_NOT_FOUND_BY_ID = "Assignment with ID {} not found."
+    ASSIGNMENT_ID_REQUIRED = "Assignment ID is required."
+    ASSIGNMENT_TITLE_REQUIRED = "Title is required."
+    ASSIGNMENT_DUE_AT_REQUIRED = "Due date is required."
+    ASSIGNMENT_DUE_AT_INVALID = "Invalid due date format."
+    ASSIGNMENT_COURSE_OFFERING_REQUIRED = "Course offering is required."
+    ASSIGNMENT_TEACHER_NOT_FOUND = "Teacher profile not found for the current user."
+    ASSIGNMENT_STUDENT_NOT_FOUND = "Student profile not found for the current user."
+    ASSIGNMENT_NOT_AUTHORIZED_FOR_OFFERING = "You are not authorized to create assignments for this course offering."
+    ASSIGNMENT_NOT_OWNED = "You can only modify assignments you created."
+    ASSIGNMENT_FILE_CONTENT_TYPE_REQUIRED = "content_type is required."
+    ASSIGNMENT_FILE_INVALID_CONTENT_TYPE = "Unsupported file type '{}'. Allowed types: PDF, DOC, DOCX, ZIP."
+    ASSIGNMENT_FILE_TOO_LARGE = "File exceeds the maximum allowed size of {} MB."
+    ASSIGNMENT_FILE_KEY_REQUIRED = "key is required."
+    ASSIGNMENT_FILE_KEY_MISMATCH = "The provided key does not belong to this assignment."
+    ASSIGNMENT_FILE_UPLOAD_NOT_FOUND = "No uploaded object was found for this key. Upload the file to S3 before confirming."
+    ASSIGNMENT_PAST_DUE = "The due date for this assignment has passed."
+    SUBMISSION_NOT_ENROLLED = "You are not enrolled in the course this assignment belongs to."
+    SUBMISSION_FILE_KEY_MISMATCH = "The provided key does not belong to your submission."
+    SUBMISSION_NOT_FOUND = "No submission found."
+
+    # ── AI Assignment Evaluation ─────────────────────────────────────────────
+    AI_EVALUATION_UNSUPPORTED_FORMAT = "AI evaluation isn't available for this file type yet. Only PDF submissions are currently supported."
+    AI_EVALUATION_UNAVAILABLE = "AI evaluation is temporarily unavailable. Please try again later."
+    AI_EVALUATION_NOT_FOUND = "No AI evaluation found for this submission."
+    AI_EVALUATION_SCORE_INVALID = "Score must be a whole number between 0 and 100."
+    AI_EVALUATION_STATUS_INVALID = "Invalid status '{}'. Must be one of: {}."
+
+    # ── Profile Picture ───────────────────────────────────────────────────────
+    PROFILE_PICTURE_CONTENT_TYPE_REQUIRED = "content_type is required."
+    PROFILE_PICTURE_INVALID_CONTENT_TYPE = (
+        "Unsupported image type '{}'. Allowed types: JPEG, PNG, WebP."
+    )
+    PROFILE_PICTURE_KEY_REQUIRED = "key is required."
+    PROFILE_PICTURE_KEY_MISMATCH = "The provided key does not belong to this profile."
+    PROFILE_PICTURE_UPLOAD_NOT_FOUND = (
+        "No uploaded object was found for this key. Upload the file to S3 before confirming."
+    )
+    PROFILE_PICTURE_TOO_LARGE = "Profile picture exceeds the maximum allowed size of {} MB."
+    PROFILE_PICTURE_NOT_FOUND = "No profile picture is set."
+
+    # ── AI Assistant ──────────────────────────────────────────────────────────
+    AI_ASSISTANT_QUESTION_REQUIRED = "Question is required."
+    AI_ASSISTANT_QUESTION_TOO_LONG = "Question must be at most {} characters."
+    AI_ASSISTANT_UNAVAILABLE = "The AI assistant is temporarily unavailable. Please try again later."

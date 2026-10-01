@@ -1,8 +1,34 @@
 from pathlib import Path
+from pathlib import Path
+from decouple import config
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-SECRET_KEY = 'django-insecure-+e8c%5(kyd0&=!b%nscq5@m^rhg!+q6t(m#cxl)+!in!puf#=!'
+SECRET_KEY = config("SECRET_KEY")
+AWS_ACCESS_KEY_ID = config("AWS_ACCESS_KEY_ID")
+AWS_SECRET_ACCESS_KEY = config("AWS_SECRET_ACCESS_KEY")
+AWS_STORAGE_BUCKET_NAME = config("AWS_STORAGE_BUCKET_NAME")
+AWS_S3_REGION_NAME = config("AWS_S3_REGION_NAME")
+GEMINI_API_KEY = config("GEMINI_API_KEY")
+
+# Model fallback chain for the Student AI Assistant's grounded Q&A
+# generation (ai_assistant.services.gemini_generation_service). Not used
+# for the Gemini embedding model, which remains a fixed single model.
+# GEMINI_FALLBACK_MODELS is a comma-separated list, tried in order only
+# after GEMINI_PRIMARY_MODEL fails with a transient (quota/availability)
+# error - see common.ai.model_router. Left empty by default: an unset/
+# empty value means "no fallback configured", not "misconfiguration".
+GEMINI_PRIMARY_MODEL = config("GEMINI_PRIMARY_MODEL", default="gemini-2.5-flash")
+GEMINI_FALLBACK_MODELS = config("GEMINI_FALLBACK_MODELS", default="")
+
+# Separate chain for AI Assignment Evaluation (assignments.services
+# .assignment_evaluation_service), which requires PDF/multimodal input and
+# structured (Pydantic) JSON output - NOT every text-generation model
+# supports that, so this must never simply reuse GEMINI_FALLBACK_MODELS.
+# Only add a model here once you've confirmed it supports PDF input,
+# multimodal generation, and response_schema-based structured output.
+GEMINI_ASSIGNMENT_PRIMARY_MODEL = config("GEMINI_ASSIGNMENT_PRIMARY_MODEL", default="gemini-2.5-flash")
+GEMINI_ASSIGNMENT_FALLBACK_MODELS = config("GEMINI_ASSIGNMENT_FALLBACK_MODELS", default="")
 
 DEBUG = True
 
@@ -17,12 +43,15 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'corsheaders',
+    'ai_assistant',
     'students',
     'teachers',
     'courses',
     'enrollments',
     'departments',
     'attendance',
+    'remarks',
+    'assignments',
     'course_offerings',
     'semesters',
     'sections',
@@ -69,11 +98,11 @@ WSGI_APPLICATION = 'student_ms.wsgi.application'
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
-        "NAME": "student_management",
-        "USER": "postgres",
-        "PASSWORD": "abc.123",
-        "HOST": "localhost",
-        "PORT": "5432",
+        "NAME": config("DB_NAME", default="student_management"),
+        "USER": config("DB_USER", default="postgres"),
+        "PASSWORD": config("DB_PASSWORD", default="abc.123"),
+        "HOST": config("DB_HOST", default="localhost"),
+        "PORT": config("DB_PORT", default="5432"),
     }
 }
 
@@ -124,3 +153,14 @@ CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
 ]
+
+
+CACHES = {
+    "default": {
+        "BACKEND": "django_redis.cache.RedisCache",
+        "LOCATION": config("REDIS_URL", default="redis://127.0.0.1:6379/1"),
+        "OPTIONS": {
+            "CLIENT_CLASS": "django_redis.client.DefaultClient",
+        },
+    }
+}

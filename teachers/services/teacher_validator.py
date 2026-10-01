@@ -3,10 +3,11 @@ from common.messages import Messages
 from common.validators import CommonValidator
 from departments.models import Department
 from teachers.models import Teacher
+from users.models import User
 
 
 class TeacherValidator:
-    def validate(self, data, teacher_id = None):
+    def validate(self, data, teacher_id = None, exclude_user_id = None):
         CommonValidator.validate_required(data, [
             "first_name",
             "last_name",
@@ -42,15 +43,14 @@ class TeacherValidator:
 
         CommonValidator.validate_positive_number(data["salary"], "Salary")
 
-        email = Teacher.objects.filter(email = data["email"].strip())
+        email_value = data["email"].strip()
         employee = Teacher.objects.filter(employee_id = data["employee_id"].strip())
 
         if teacher_id:
-            email = email.exclude(id = teacher_id)
             employee = employee.exclude(id = teacher_id)
 
-        if email.exists():
-            raise ValueError(Messages.EMAIL_ALREADY_EXISTS.format(data["email"].strip()))
+        if User.objects.filter(email__iexact = email_value).exclude(id = exclude_user_id or 0).exists():
+            raise ValueError(Messages.EMAIL_ALREADY_EXISTS.format(email_value))
 
         if employee.exists():
             raise ValueError(Messages.EMPLOYEE_ID_EXISTS.format(data["employee_id"].strip()))

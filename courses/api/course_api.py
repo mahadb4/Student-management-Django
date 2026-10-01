@@ -3,17 +3,20 @@ import json
 from django.db.models.deletion import ProtectedError
 from django.http import HttpResponse, JsonResponse
 from django.views.decorators.csrf import csrf_exempt
+from common.cache.cache_service import CacheService
 from common.messages import Messages
+from courses.cache.course_cache import CourseCache
 from courses.models import Course
-from courses.repositories.course_repository import CourseRepository
+from courses.repositories.course_repository import DEFAULT_ORDERING, ORDERING_FIELDS, CourseRepository
 from courses.services.course_service import CourseService
 from courses.services.course_validator import CourseValidator
 
 course_validator = CourseValidator()
 course_repository = CourseRepository()
-course_service = CourseService(course_validator, course_repository)
+course_cache = CourseCache(CacheService())
+course_service = CourseService(course_validator, course_repository, course_cache)
 
-from common.utils import paginate_queryset
+from common.utils import paginate_queryset, resolve_ordering_param, resolve_pagination_params
 from courses.mappers.course_mapper import CourseMapper
 
 def serialize_course(course):
@@ -23,6 +26,7 @@ def serialize_course(course):
         "code": course.code,
         "description": course.description,
         "credits": course.credits,
+        "semester_number": course.semester_number,
         "department": course.department_id,
         "teacher": course.teacher_id,
         "is_active": course.is_active,
@@ -40,8 +44,12 @@ def course_api(request, course_id = None):
                 return JsonResponse(serialize_course(course))
 
             search = request.GET.get("search", "").strip() or None
-            courses = course_repository.get_queryset_for_list(search = search)
-            return paginate_queryset(request, courses, CourseMapper.to_list_dto)
+            #Normalize paging/ordering before they reach the cache key.
+            page_number, page_size = resolve_pagination_params(request)
+            ordering = resolve_ordering_param(request, ORDERING_FIELDS, DEFAULT_ORDERING)
+            return JsonResponse(
+                course_service.get_list(request.user, search, page_number, page_size, ordering)
+            )
 
         if request.method == "POST":
             data = json.loads(request.body)
@@ -96,3 +104,23 @@ def course_api(request, course_id = None):
 
     except ValueError as e:
         return JsonResponse({"error": str(e)}, status = 400)
+
+
+@csrf_exempt
+@enforce_permissions('courses', 'course')
+def course_reference_api(request):
+    if request.method != "GET":
+        return JsonResponse({"error": Messages.METHOD_NOT_ALLOWED}, status = 405)
+
+    #"" -> None BEFORE these reach the cache key, so requests selecting the same
+    #rows share one entry.
+    department_id = request.GET.get("department_id") or None
+    semester_number = request.GET.get("semester_number") or None
+
+    page_number, page_size = resolve_pagination_params(request, default_page_size = 10)
+
+    return JsonResponse(
+        course_service.get_reference_list(
+            request.user, department_id, semester_number, page_number, page_size,
+        )
+    )

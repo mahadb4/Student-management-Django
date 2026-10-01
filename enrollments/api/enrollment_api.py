@@ -2,17 +2,22 @@ import json
 from django.db.models.deletion import ProtectedError
 from django.http import HttpResponse, JsonResponse
 from django.views.decorators.csrf import csrf_exempt
+from common.cache.cache_service import CacheService
 from common.messages import Messages
+from common.services.s3_service import S3Service
+from enrollments.cache.enrollment_cache import EnrollmentCache
 from enrollments.models import Enrollment
-from enrollments.repositories.enrollment_repository import EnrollmentRepository
+from enrollments.repositories.enrollment_repository import DEFAULT_ORDERING, ORDERING_FIELDS, EnrollmentRepository
 from enrollments.services.enrollment_service import EnrollmentService
 from enrollments.services.enrollment_validator import EnrollmentValidator
 
 enrollment_validator = EnrollmentValidator()
 enrollment_repository = EnrollmentRepository()
-enrollment_service = EnrollmentService(enrollment_validator, enrollment_repository)
+enrollment_cache = EnrollmentCache(CacheService())
+enrollment_service = EnrollmentService(enrollment_validator, enrollment_repository, enrollment_cache)
+s3_service = S3Service()
 
-from common.utils import paginate_queryset
+from common.utils import attach_profile_picture_urls, build_paginated_payload, paginate_queryset, resolve_ordering_param, resolve_pagination_params
 
 
 def serialize_enrollment(enrollment):
@@ -46,8 +51,19 @@ def enrollment_api(request, enrollment_id = None):
                 return JsonResponse(serialize_enrollment(enrollment))
 
             search = request.GET.get("search", "").strip() or None
-            enrollments = apply_data_scope(request.user, enrollment_repository.get_queryset_for_list(search = search), 'enrollment')
-            return paginate_queryset(request, enrollments, EnrollmentMapper.to_list_dto)
+            #Optional: scopes the Admin Attendance Add/Edit modal's enrollment
+            #picker to one course offering (see EnrollmentRepository.get_queryset_for_list).
+            course_offering_id = request.GET.get("course_offering_id", "").strip() or None
+            #Opt-in narrower projection for that same Attendance modal - absent
+            #-> unfiltered (existing behavior unchanged) for Enrollments.tsx.
+            view = request.GET.get("view", "").strip() or None
+            #Normalize paging/ordering before they reach the cache key. Scope
+            #filtering, ordering, pagination and DTO mapping happen inside the service.
+            page_number, page_size = resolve_pagination_params(request)
+            ordering = resolve_ordering_param(request, ORDERING_FIELDS, DEFAULT_ORDERING)
+            return JsonResponse(
+                enrollment_service.get_list(request.user, search, page_number, page_size, ordering, course_offering_id, view)
+            )
 
         if request.method == "POST":
             data = json.loads(request.body)
@@ -104,7 +120,62 @@ def enrollment_api(request, enrollment_id = None):
         return JsonResponse({"error": str(e)}, status = 400)
 
 
+@csrf_exempt
 def my_enrollments_api(request):
+    if request.method not in ("GET", "POST"):
+        return JsonResponse({"error": Messages.METHOD_NOT_ALLOWED}, status = 405)
+
+    from common.permissions import authenticate_request
+    user, error = authenticate_request(request)
+    if error:
+        return error
+
+    student = getattr(user, "student_profile", None)
+    if not student:
+        return JsonResponse({"error": Messages.STUDENT_NOT_FOUND}, status = 404)
+
+    if request.method == "GET":
+        qs = enrollment_repository.get_queryset_for_list().filter(student_id = student.id, is_deleted = False)
+        page_number, page_size = resolve_pagination_params(request, default_page_size = 10)
+        payload = build_paginated_payload(qs, page_number, page_size, EnrollmentMapper.to_student_list_dto)
+        payload["results"] = attach_profile_picture_urls(payload["results"], s3_service)
+        return JsonResponse(payload)
+
+    # POST: student self-enrollment - the student identity comes from the
+    # authenticated request (student.id above), never from the request body,
+    # so a student can only ever enroll themself. Reuses the same
+    # enrollment_service.create() (and its validation/business rules) as the
+    # generic Admin enrollment_api - just with "student" supplied server-side
+    # instead of accepted from the client.
+    try:
+        data = json.loads(request.body)
+
+        if not isinstance(data, dict):
+            raise ValueError(Messages.REQUEST_BODY_MUST_BE_JSON_OBJECT)
+
+        enrollment = enrollment_service.create({
+            "student": student.id,
+            "course_offering": data.get("course_offering"),
+            "status": data.get("status", Enrollment.Status.ACTIVE),
+        })
+
+        result = attach_profile_picture_urls([EnrollmentMapper.to_student_list_dto(enrollment)], s3_service)[0]
+        return JsonResponse(result, status = 201)
+
+    except json.JSONDecodeError:
+        return JsonResponse({"error": Messages.INVALID_JSON}, status = 400)
+
+    except ValueError as e:
+        return JsonResponse({"error": str(e)}, status = 400)
+
+
+def my_enrollments_reference_api(request):
+    # Minimal projection for the Student Attendance course filter dropdown -
+    # reuses the same repository/scoping as my_enrollments_api above (only the
+    # authenticated student's own, non-deleted enrollments), just mapped to a
+    # narrower DTO. Restricted to ACTIVE: a DROPPED enrollment (e.g. the
+    # stale-duplicate side of a teacher reassignment) is a course the student
+    # is no longer taking, so it must not be selectable in this dropdown.
     if request.method != "GET":
         return JsonResponse({"error": Messages.METHOD_NOT_ALLOWED}, status = 405)
 
@@ -117,5 +188,7 @@ def my_enrollments_api(request):
     if not student:
         return JsonResponse({"error": Messages.STUDENT_NOT_FOUND}, status = 404)
 
-    qs = enrollment_repository.get_queryset_for_list().filter(student_id = student.id, is_deleted = False)
-    return paginate_queryset(request, qs, EnrollmentMapper.to_list_dto)
+    qs = enrollment_repository.get_queryset_for_list().filter(
+        student_id = student.id, is_deleted = False, status = Enrollment.Status.ACTIVE,
+    )
+    return paginate_queryset(request, qs, EnrollmentMapper.to_reference_dto, default_page_size = 10)

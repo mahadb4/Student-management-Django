@@ -1,4 +1,5 @@
 from datetime import date,datetime
+from django.db.models import Q
 from common.messages import Messages
 from common.validators import CommonValidator
 from attendance.models import Attendance
@@ -9,6 +10,9 @@ class AttendanceValidator:
         CommonValidator.validate_required(data,["enrollment_id","date","status"])
         enrollment_id = data["enrollment_id"]
 
+        # Kept consistent with AttendanceService.get_active_enrollment - see
+        # that method's comment for why course/teacher/section are re-checked
+        # instead of only trusting course_offering.is_active.
         if not Enrollment.objects.filter(
             id = enrollment_id,
             status = Enrollment.Status.ACTIVE,
@@ -17,6 +21,10 @@ class AttendanceValidator:
             student__is_active = True,
             course_offering__is_deleted = False,
             course_offering__is_active = True,
+            course_offering__course__is_active = True,
+            course_offering__teacher__is_active = True,
+        ).filter(
+            Q(course_offering__section__isnull = True) | Q(course_offering__section__is_active = True),
         ).exists():
             raise ValueError(Messages.ATTENDANCE_ENROLLMENT_NOT_FOUND)
 

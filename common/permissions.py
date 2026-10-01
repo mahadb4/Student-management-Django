@@ -10,7 +10,6 @@ def _get_profile(user, attribute):
     except ObjectDoesNotExist:
         return None
 
-#This function authenticates the incoming request
 def authenticate_request(request):
     try:
         result = JWTAuthentication().authenticate(request)
@@ -21,49 +20,66 @@ def authenticate_request(request):
         return None, JsonResponse({"error": Messages.AUTH_CREDENTIALS_NOT_PROVIDED}, status = 401)
 
     user, _ = result
+    
+    if user.role == "student":
+        student = _get_profile(user, "student_profile")
+        if student and not student.placement_confirmed:
+            return None, JsonResponse({"error": Messages.ACADEMIC_PLACEMENT_PENDING}, status = 403)
+
     return user, None
+
+
+# Resolves viewer identity for data-scoping; cache layers key on this so
+# cached data can never leak across permission scopes.
+def get_scope_identity(user):
+    if not user.is_authenticated:
+        return "anon", None
+
+    if user.is_superuser:
+        return "all", None
+
+    user_teacher = _get_profile(user, "teacher_profile")
+    if user_teacher:
+        return "teacher", user_teacher
+
+    user_student = _get_profile(user, "student_profile")
+    if user_student:
+        return "student", user_student
+
+    return "none", None
 
 
 def apply_data_scope(user, queryset, model_type):
 
-    #queryset.model means the Django model behind the queryset
     if hasattr(queryset.model, "is_deleted"):
         queryset = queryset.filter(is_deleted = False)
 
-    if not user.is_authenticated:
+    kind, profile = get_scope_identity(user)
+
+    if kind == "anon":
         return queryset.none()
 
-    #for admin, No teacher/student restrictions are applied.
-    if user.is_superuser:
+    if kind == "all":
         return queryset
 
-    user_student = _get_profile(user, "student_profile")
-    user_teacher = _get_profile(user, "teacher_profile")
+    user_teacher = profile if kind == "teacher" else None
+    user_student = profile if kind == "student" else None
 
     if model_type == "student":
         if user_teacher:
-
-        # Only return students connected to courses taught by this teacher.    
             return queryset.filter(
                 enrollments__course_offering__teacher = user_teacher
             ).distinct()
 
-        # A student can only see their own Student record.
         if user_student:
             return queryset.filter(id = user_student.id)
 
-    #If the user is neither recognized as Teacher nor Student: Return nothing
         return queryset.none()
 
-
-    #TEACHER DATA SCOPE
     if model_type == "teacher":
-        #A teacher only sees their own profile
         if user_teacher:
             return queryset.filter(id = user_teacher.id)
 
-
-        #The student can see teachers connected to their enrolled courses
         if user_student:
             return queryset.filter(
                 course_offerings__enrollments__student = user_student
@@ -71,8 +87,6 @@ def apply_data_scope(user, queryset, model_type):
 
         return queryset.none()
 
-    
-    #COURSE OFFERING DATA SCOPE
     if model_type in ["course_offering", "courseoffering"]:
         if user_teacher:
             return queryset.filter(teacher = user_teacher)

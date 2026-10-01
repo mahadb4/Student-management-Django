@@ -2,17 +2,20 @@ import json
 from django.db.models.deletion import ProtectedError
 from django.http import HttpResponse, JsonResponse
 from django.views.decorators.csrf import csrf_exempt
+from common.cache.cache_service import CacheService
 from common.messages import Messages
+from course_offerings.cache.course_offering_cache import CourseOfferingCache
 from course_offerings.models import CourseOffering
-from course_offerings.repositories.course_offering_repository import CourseOfferingRepository
+from course_offerings.repositories.course_offering_repository import DEFAULT_ORDERING, ORDERING_FIELDS, CourseOfferingRepository
 from course_offerings.services.course_offering_service import CourseOfferingService
 from course_offerings.services.course_offering_validator import CourseOfferingValidator
 
 course_offering_validator = CourseOfferingValidator()
 course_offering_repository = CourseOfferingRepository()
-course_offering_service = CourseOfferingService(course_offering_validator, course_offering_repository)
+course_offering_cache = CourseOfferingCache(CacheService())
+course_offering_service = CourseOfferingService(course_offering_validator, course_offering_repository, course_offering_cache)
 
-from common.utils import paginate_queryset
+from common.utils import paginate_queryset, resolve_ordering_param, resolve_pagination_params
 
 
 def serialize_course_offering(offering):
@@ -49,8 +52,33 @@ def course_offering_api(request, offering_id = None):
                 return JsonResponse(serialize_course_offering(offering))
 
             search = request.GET.get("search", "").strip() or None
-            offerings = apply_data_scope(request.user, course_offering_repository.get_queryset_for_list(search = search), 'courseoffering')
-            return paginate_queryset(request, offerings, CourseOfferingMapper.to_list_dto)
+
+            # Optional dependent-dropdown filter: when a student is selected in
+            # the Admin Enrollment form, only offerings matching that student's
+            # own section should be selectable. Absent -> unfiltered (existing
+            # behavior unchanged).
+            section_id_param = request.GET.get("section_id", "").strip()
+            section_id = int(section_id_param) if section_id_param.isdigit() else None
+
+            # Opt-in, default unchanged: only a picker selecting an offering
+            # for a NEW Enrollment sends this (see Enrollments.tsx) - the
+            # CourseOfferings management table still needs inactive rows.
+            active_only = request.GET.get("active_only", "").strip().lower() == "true"
+
+            # Opt-in narrower projection for the Admin Student Edit form's
+            # Course Offering picker - absent -> unfiltered (existing behavior
+            # unchanged) for CourseOfferings.tsx and Enrollments.tsx.
+            view = request.GET.get("view", "").strip() or None
+
+            #Normalize paging/ordering before they reach the cache key. Scope
+            #filtering, ordering, pagination and DTO mapping happen inside the service.
+            page_number, page_size = resolve_pagination_params(request)
+            ordering = resolve_ordering_param(request, ORDERING_FIELDS, DEFAULT_ORDERING)
+            return JsonResponse(
+                course_offering_service.get_list(
+                    request.user, search, section_id, page_number, page_size, active_only, ordering, view,
+                )
+            )
 
         if request.method == "POST":
             data = json.loads(request.body)
@@ -107,6 +135,42 @@ def course_offering_api(request, offering_id = None):
         return JsonResponse({"error": str(e)}, status = 400)
 
 
+@csrf_exempt
+@enforce_permissions('course_offerings', 'courseoffering')
+def course_offering_reference_api(request):
+    if request.method != "GET":
+        return JsonResponse({"error": Messages.METHOD_NOT_ALLOWED}, status = 405)
+
+    search = request.GET.get("search", "").strip() or None
+
+    # Optional dependent-dropdown filter for the Admin Attendance page's
+    # Course/Section step: once a Teacher is selected, only that teacher's own
+    # offerings should be selectable. ORM-filtered alongside the existing scope,
+    # not fetched broadly and narrowed client-side.
+    teacher_id_param = request.GET.get("teacher_id", "").strip()
+    teacher_id = int(teacher_id_param) if teacher_id_param.isdigit() else None
+
+    # Opt-in narrower projection for the Admin Attendance page's Course/Section
+    # picker - absent -> unfiltered (existing behavior unchanged) for every
+    # other caller (student Courses.tsx, etc).
+    view = request.GET.get("view", "").strip() or None
+
+    # Admins and teachers keep their normal data scope here. Students get
+    # section-matched DISCOVERY instead of their enrolment-based scope, which
+    # otherwise made the "Available Offerings" tab permanently empty (it returned
+    # only offerings they were already enrolled in, which the frontend then
+    # subtracted). Enrolment authorisation is unchanged - it is enforced by
+    # enrollment_service._validate_student_section on POST. See
+    # CourseOfferingService.get_reference_list().
+    page_number, page_size = resolve_pagination_params(request, default_page_size = 10)
+
+    return JsonResponse(
+        course_offering_service.get_reference_list(
+            request.user, search, page_number, page_size, teacher_id, view,
+        )
+    )
+
+
 def my_course_offerings_api(request):
     if request.method != "GET":
         return JsonResponse({"error": Messages.METHOD_NOT_ALLOWED}, status = 405)
@@ -120,5 +184,15 @@ def my_course_offerings_api(request):
     if not teacher:
         return JsonResponse({"error": Messages.TEACHER_NOT_FOUND}, status = 404)
 
-    qs = course_offering_repository.get_queryset_for_list().filter(teacher_id = teacher.id, is_deleted = False)
-    return paginate_queryset(request, qs, CourseOfferingMapper.to_list_dto)
+    # Opt-in narrower projections for specific consumers - every other caller
+    # (the full My Classes page) keeps the fuller default shape.
+    view = request.GET.get("view")
+    if view == "attendance":
+        mapper_func = CourseOfferingMapper.to_attendance_list_dto
+    elif view == "dashboard":
+        mapper_func = CourseOfferingMapper.to_dashboard_list_dto
+    else:
+        mapper_func = CourseOfferingMapper.to_teacher_list_dto
+
+    qs = course_offering_repository.get_queryset_for_teacher_list(teacher.id)
+    return paginate_queryset(request, qs, mapper_func, default_page_size = 10)

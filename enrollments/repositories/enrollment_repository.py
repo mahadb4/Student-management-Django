@@ -2,29 +2,54 @@ from django.db.models import Q
 from common.repositories.base_repository import BaseRepository
 from enrollments.models import Enrollment
 
+#Only Name sorting is supported (by design - see common.utils.apply_ordering()).
+#"name" is the enrolled Student's name.
+ORDERING_FIELDS = {
+    "name": ("student__user__name",),
+}
+DEFAULT_ORDERING = "name"
+
 
 class EnrollmentRepository(BaseRepository):
     def __init__(self):
         super().__init__(Enrollment)
 
-    def get_queryset_for_list(self, search = None):
-        queryset = self.model.objects.select_related("student", "course_offering__course", "course_offering__section").only(
+    def get_queryset_for_list(self, search = None, course_offering_id = None):
+        #No .order_by() here - final ordering is applied by the service, after
+        #apply_data_scope(), via common.utils.apply_ordering() (see ORDERING_FIELDS above).
+        queryset = self.model.objects.select_related(
+            "student__user", "course_offering__course", "course_offering__section",
+            "course_offering__teacher__user",
+        ).only(
             "id", "status",
-            "student__id", "student__first_name", "student__last_name", "student__student_email",
+            "student__id", "student__user_id", "student__user__name", "student__user__email",
+            "student__user__profile_picture_key",
             "course_offering__id", "course_offering__semester", "course_offering__academic_year",
             "course_offering__course__id", "course_offering__course__name", "course_offering__course__code",
             "course_offering__section__id", "course_offering__section__name",
-        ).order_by("id")
+            "course_offering__teacher__id",
+            "course_offering__teacher__user_id", "course_offering__teacher__user__name",
+            "course_offering__teacher__user__email", "course_offering__teacher__user__profile_picture_key",
+        )
 
         if search:
             for term in search.split():
                 queryset = queryset.filter(
-                    Q(student__first_name__icontains = term)
-                    | Q(student__last_name__icontains = term)
-                    | Q(student__student_email__icontains = term)
+                    Q(student__user__name__icontains = term)
+                    | Q(student__user__email__icontains = term)
                     | Q(course_offering__course__name__icontains = term)
                     | Q(course_offering__course__code__icontains = term)
                 )
+
+        # Used by the Admin Attendance Add/Edit modal's enrollment picker
+        # (?course_offering_id=) to scope student choices to the selected
+        # offering only - restricted to ACTIVE so a dropped/completed
+        # enrollment isn't offered for marking new attendance.
+        if course_offering_id:
+            queryset = queryset.filter(
+                course_offering_id = course_offering_id,
+                status = Enrollment.Status.ACTIVE,
+            )
 
         return queryset
 
