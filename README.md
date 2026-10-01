@@ -93,47 +93,33 @@ Configured via `python-decouple`, read from a `.env` file in `student_ms/`:
 | `GEMINI_ASSIGNMENT_PRIMARY_MODEL` | Primary model for assignment evaluation | `gemini-2.5-flash` |
 | `GEMINI_ASSIGNMENT_FALLBACK_MODELS` | Comma-separated fallback models for evaluation | empty (no fallback) |
 
-The database (PostgreSQL, `student_management` DB) and Redis (`redis://127.0.0.1:6379/1`) connections are currently hardcoded in `settings.py` rather than read from `.env`.
+Database (`DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_HOST`, `DB_PORT`) and Redis (`REDIS_URL`) settings are also read from `.env`, but Docker Compose overrides them to use its own local containers.
 
 ## Local Setup
 
-### Prerequisites
-- Python 3.10+
-- PostgreSQL with the `pgvector` extension available
-- Redis server
-- AWS S3 bucket and credentials (or a compatible substitute) for file uploads
-- A Google Gemini API key
+Requires only Docker (with Docker Compose). PostgreSQL + pgvector and Redis run as containers.
 
-### Steps (Windows PowerShell)
-
-```powershell
-cd student-management-django\student_ms
-python -m venv .venv
-.venv\Scripts\Activate.ps1
-pip install -r requirements.txt
+```bash
+git clone https://github.com/mahadb4/Student-management-Django.git
+cd Student-management-Django
+cp .env.example .env
+docker compose up --build -d
+docker compose exec web python manage.py migrate
+docker compose exec web python manage.py test
 ```
 
-Create a `.env` file in `student_ms/` with the variables listed above.
+On Windows PowerShell, use `Copy-Item .env.example .env` instead of `cp`.
 
-Create the PostgreSQL database and enable pgvector:
+`.env.example` contains placeholders only. They are enough to start the app and run the test suite, but to use S3 uploads or the Gemini-powered AI features you must replace `AWS_*` and `GEMINI_API_KEY` in `.env` with your own values. Never commit `.env`.
 
-```sql
-CREATE DATABASE student_management;
-\c student_management
-CREATE EXTENSION IF NOT EXISTS vector;
-```
+The PostgreSQL database used here is a local Docker container (`db` service) that starts empty. It is not the production AWS RDS database, and nothing in this setup connects to RDS.
 
-Apply migrations and run the server:
-
-```powershell
-python manage.py migrate
-python manage.py createsuperuser
-python manage.py runserver
-```
-
-Server runs at `http://127.0.0.1:8000/`, with the frontend dev server expected at `http://localhost:5173` (configured in `CORS_ALLOWED_ORIGINS`).
+The API runs at `http://localhost:8000/`, with the frontend dev server expected at `http://localhost:5173` (configured in `CORS_ALLOWED_ORIGINS`).
 
 ### Useful management commands
+
+Run these with `docker compose exec web <command>`:
+
 
 - `python manage.py create_admin` — create an admin user
 - `python manage.py seed_academic_data` (course_offerings) — seed departments/courses/sections/offerings
