@@ -1,6 +1,6 @@
 from pathlib import Path
 from pathlib import Path
-from decouple import config
+from decouple import Csv, config
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -30,9 +30,9 @@ GEMINI_FALLBACK_MODELS = config("GEMINI_FALLBACK_MODELS", default="")
 GEMINI_ASSIGNMENT_PRIMARY_MODEL = config("GEMINI_ASSIGNMENT_PRIMARY_MODEL", default="gemini-2.5-flash")
 GEMINI_ASSIGNMENT_FALLBACK_MODELS = config("GEMINI_ASSIGNMENT_FALLBACK_MODELS", default="")
 
-DEBUG = True
+DEBUG = config("DEBUG", default=True, cast=bool)
 
-ALLOWED_HOSTS = ["localhost", "127.0.0.1"]
+ALLOWED_HOSTS = config("ALLOWED_HOSTS", default="localhost,127.0.0.1", cast=Csv())
 
 
 INSTALLED_APPS = [
