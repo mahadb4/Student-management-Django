@@ -1,3 +1,6 @@
+import json
+import os
+import urllib.request
 from pathlib import Path
 from pathlib import Path
 from decouple import Csv, config
@@ -33,6 +36,17 @@ GEMINI_ASSIGNMENT_FALLBACK_MODELS = config("GEMINI_ASSIGNMENT_FALLBACK_MODELS", 
 DEBUG = config("DEBUG", default=True, cast=bool)
 
 ALLOWED_HOSTS = config("ALLOWED_HOSTS", default="localhost,127.0.0.1", cast=Csv())
+
+# On ECS, allow the task's own private IP so ALB health checks (Host: <task IP>) pass
+_ecs_metadata_uri = os.environ.get("ECS_CONTAINER_METADATA_URI_V4")
+if _ecs_metadata_uri:
+    try:
+        with urllib.request.urlopen(f"{_ecs_metadata_uri}/task", timeout=2) as _response:
+            for _container in json.load(_response).get("Containers", []):
+                for _network in _container.get("Networks", []):
+                    ALLOWED_HOSTS.extend(_network.get("IPv4Addresses", []))
+    except (OSError, ValueError):
+        pass
 
 
 INSTALLED_APPS = [
