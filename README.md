@@ -10,6 +10,7 @@ A Django + Django REST Framework backend for a Student Management System, using 
 - **File storage**: AWS S3 (`boto3`) — pre-signed upload/view URLs for profile pictures and assignment/submission files
 - **AI**: Google Gemini (`google-genai`) — grounded Q&A for the Student AI Assistant, and PDF assignment evaluation
 - **Config**: `python-decouple`, reading from a `.env` file
+- **Deployment**: Docker Compose on EC2, images in ECR, deployed from GitHub Actions through AWS SSM
 
 ## Applications
 
@@ -78,26 +79,32 @@ Each domain app follows a layered structure: `api/` (view functions) → `servic
 
 ## Environment Variables
 
-Configured via `python-decouple`, read from a `.env` file in `student_ms/`:
+Configured with `python-decouple` from a `.env` file in `student_ms/`. Copy `.env.example` for local development; never commit `.env`.
 
 | Variable | Purpose | Default |
 | --- | --- | --- |
-| `SECRET_KEY` | Django secret key | required |
-| `AWS_ACCESS_KEY_ID` | S3 credentials | required |
-| `AWS_SECRET_ACCESS_KEY` | S3 credentials | required |
-| `AWS_STORAGE_BUCKET_NAME` | S3 bucket name | required |
-| `AWS_S3_REGION_NAME` | S3 region | required |
+| `SECRET_KEY` | Django secret key (also signs JWTs) | required |
+| `DEBUG` | Django debug mode | `False` (`.env.example` sets `True` for local use) |
+| `ALLOWED_HOSTS` | Comma-separated hostnames Django accepts | `localhost,127.0.0.1` |
+| `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER` | PostgreSQL connection | `localhost`, `5432`, `student_management`, `postgres` |
+| `DB_PASSWORD` | PostgreSQL password | required |
+| `REDIS_URL` | Redis cache URL | `redis://127.0.0.1:6379/1` |
+| `CORS_ALLOWED_ORIGINS` | Comma-separated frontend origins | `http://localhost:5173,http://127.0.0.1:5173` |
+| `CSRF_TRUSTED_ORIGINS` | Comma-separated trusted HTTPS origins (Django admin) | empty |
+| `USE_X_FORWARDED_PROTO` | Trust the load balancer's `X-Forwarded-Proto` header | `False` |
+| `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` | S3 credentials | required |
+| `AWS_STORAGE_BUCKET_NAME`, `AWS_S3_REGION_NAME` | S3 bucket and region | required |
 | `GEMINI_API_KEY` | Google Gemini API key | required |
 | `GEMINI_PRIMARY_MODEL` | Primary model for AI Assistant Q&A | `gemini-2.5-flash` |
 | `GEMINI_FALLBACK_MODELS` | Comma-separated fallback models for Q&A | empty (no fallback) |
 | `GEMINI_ASSIGNMENT_PRIMARY_MODEL` | Primary model for assignment evaluation | `gemini-2.5-flash` |
 | `GEMINI_ASSIGNMENT_FALLBACK_MODELS` | Comma-separated fallback models for evaluation | empty (no fallback) |
 
-Database (`DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_HOST`, `DB_PORT`) and Redis (`REDIS_URL`) settings are also read from `.env`, but Docker Compose overrides them to use its own local containers.
+`docker-compose.yml` (local) overrides `DB_HOST` and `REDIS_URL` to point at its own containers. `docker-compose.prod.yml` forces `DEBUG=False` and `REDIS_URL=redis://redis:6379/1`; everything else comes from the production `.env`, plus `BACKEND_IMAGE` (the ECR image to run).
 
-## Local Setup
+## Local Development
 
-Requires only Docker (with Docker Compose). PostgreSQL + pgvector and Redis run as containers.
+Requires Docker with Docker Compose. PostgreSQL + pgvector and Redis run as containers.
 
 ```bash
 git clone https://github.com/mahadb4/Student-management-Django.git
@@ -110,11 +117,12 @@ docker compose exec web python manage.py test
 
 On Windows PowerShell, use `Copy-Item .env.example .env` instead of `cp`.
 
-`.env.example` contains placeholders only. They are enough to start the app and run the test suite, but to use S3 uploads or the Gemini-powered AI features you must replace `AWS_*` and `GEMINI_API_KEY` in `.env` with your own values. Never commit `.env`.
+`.env.example` contains placeholders only. They are enough to start the app and run the tests; to use S3 uploads or the AI features, replace the `AWS_*` and `GEMINI_API_KEY` values in your own `.env`. `DB_PASSWORD` is used by both the Django container and the local `db` container. If you already have a local `pgdata` volume created with a different password, set `DB_PASSWORD` to that password or run `docker compose down -v` (this deletes local data).
 
-The PostgreSQL database used here is a local Docker container (`db` service) that starts empty. It is not the production AWS RDS database, and nothing in this setup connects to RDS.
+The local database is a Docker container that starts empty. It is not the production RDS database.
 
-The API runs at `http://localhost:8000/`, with the frontend dev server expected at `http://localhost:5173` (configured in `CORS_ALLOWED_ORIGINS`).
+- Backend API: `http://localhost:8000/`
+- Frontend dev server (separate repository): `http://localhost:5173`
 
 ### Useful management commands
 
@@ -126,3 +134,71 @@ Run these with `docker compose exec web <command>`:
 - `python manage.py seed_dev_students` (students) — seed sample students
 - `python manage.py generate_remark_embeddings` (ai_assistant) — backfill Gemini embeddings for existing remarks
 - `python manage.py list_gemini_models` / `print_ai_model_chains` (ai_assistant) — inspect available Gemini models and configured fallback chains
+
+## Production Architecture
+
+```
+Vercel (React/Vite frontend)
+   -> Application Load Balancer
+      -> EC2 instance, port 8000
+         -> Docker Compose: Django/Gunicorn + Redis
+            -> RDS PostgreSQL
+            -> S3 (private bucket, presigned URLs)
+            -> Gemini API
+```
+
+- **Frontend**: React/Vite app deployed on Vercel.
+- **Backend**: Django + Gunicorn in Docker on a single EC2 instance, started with `docker-compose.prod.yml` (services `web` and `redis`).
+- **Images**: stored in Amazon ECR (`student-management-backend`), tagged with the Git commit SHA.
+- **Database**: PostgreSQL on AWS RDS. There is no database container in production.
+- **Cache**: Redis runs as a Docker container on the EC2 instance and is not published outside the Docker network.
+- **Files**: profile pictures and assignment files live in a private S3 bucket and are accessed through presigned URLs. The browser talks to S3 directly, so the bucket needs a CORS rule for the Vercel origin.
+- **Traffic**: the Application Load Balancer forwards to EC2 port 8000. The EC2 private IP must be in `ALLOWED_HOSTS` so load balancer health checks pass.
+- **AI**: Gemini is called from the backend for the RAG assistant, embeddings and assignment evaluation.
+
+PostgreSQL is not a production container; Redis is the only data service running next to Django.
+
+The server keeps `/home/ec2-user/student-management/.env` (production secrets, not in Git) and `docker-compose.prod.yml`. The `.env` needs the variables listed above plus `BACKEND_IMAGE`, which the deploy script updates on each deployment.
+
+## Deployment / CI-CD
+
+Pushing to `main` runs `.github/workflows/deploy.yml`:
+
+1. GitHub Actions runs the Django checks, migration check and tests.
+2. It assumes the AWS role through OIDC, builds the Docker image and pushes it to ECR, tagged with the commit SHA.
+3. It sends an AWS SSM `SendCommand` to the EC2 instance, which writes `deploy/deploy.sh` from the commit and runs it with the commit SHA.
+4. The script logs in to ECR with the instance's IAM role, pulls that exact image and runs `docker compose up -d`.
+5. It runs `manage.py migrate`, then checks `http://127.0.0.1:8000/admin/login/` locally.
+6. The workflow polls `GetCommandInvocation`, prints the command output and fails if the deployment did not succeed.
+
+Pushes to `dev` only run the tests. `docker-compose.prod.yml` is not synced by the pipeline; copy it to the server if it changes.
+
+GitHub repository variables used by the workflow (no secrets are stored in GitHub):
+
+- `AWS_REGION`
+- `AWS_ROLE_ARN`
+- `ECR_REPOSITORY`
+
+The workflow's AWS role (assumed through OIDC) only needs to push to ECR, call `ssm:SendCommand` and call `ssm:GetCommandInvocation`. The EC2 instance's own IAM role pulls from ECR and is what the script uses to log in.
+
+To deploy manually on the server: `cd /home/ec2-user/student-management && ./deploy/deploy.sh <commit-sha>`.
+
+## AWS Services
+
+| Service | Role |
+| --- | --- |
+| EC2 | Runs the Django and Redis containers with Docker Compose |
+| ALB | Internet-facing entry point, forwards to EC2 port 8000 |
+| RDS PostgreSQL | Production database (with the `vector` extension) |
+| S3 | Private bucket for profile pictures, assignment files and submissions |
+| ECR | Stores the backend Docker images |
+| SSM | Lets GitHub Actions run the deploy script on EC2 without SSH |
+| IAM (OIDC) | GitHub Actions assumes a role to push images and send SSM commands |
+
+S3 CORS: the browser uploads and downloads directly with presigned URLs, so the bucket needs a CORS rule that allows the `GET`, `PUT` and `HEAD` methods, all headers, and these origins: the Vercel production frontend (`https://<your-vercel-domain>`, no trailing slash) and `http://localhost:5173` for local development. Without it, uploads fail with a 403 on the preflight request.
+
+Django CORS is separate: set `CORS_ALLOWED_ORIGINS` to the same frontend origins.
+
+## Default passwords
+
+Accounts created through the student and teacher create endpoints, and by the seed and reset management commands (`seed_academic_data`, `seed_dev_students`, `reset_student_teacher_passwords`), get a shared default password defined in code. These are development and onboarding defaults, not production credentials. The application does not currently force a password change on first login, so change or reset these passwords before real use.

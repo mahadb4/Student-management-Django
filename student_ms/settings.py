@@ -1,7 +1,3 @@
-import json
-import os
-import urllib.request
-from pathlib import Path
 from pathlib import Path
 from decouple import Csv, config
 
@@ -33,20 +29,9 @@ GEMINI_FALLBACK_MODELS = config("GEMINI_FALLBACK_MODELS", default="")
 GEMINI_ASSIGNMENT_PRIMARY_MODEL = config("GEMINI_ASSIGNMENT_PRIMARY_MODEL", default="gemini-2.5-flash")
 GEMINI_ASSIGNMENT_FALLBACK_MODELS = config("GEMINI_ASSIGNMENT_FALLBACK_MODELS", default="")
 
-DEBUG = config("DEBUG", default=True, cast=bool)
+DEBUG = config("DEBUG", default=False, cast=bool)
 
 ALLOWED_HOSTS = config("ALLOWED_HOSTS", default="localhost,127.0.0.1", cast=Csv())
-
-# On ECS, allow the task's own private IP so ALB health checks (Host: <task IP>) pass
-_ecs_metadata_uri = os.environ.get("ECS_CONTAINER_METADATA_URI_V4")
-if _ecs_metadata_uri:
-    try:
-        with urllib.request.urlopen(f"{_ecs_metadata_uri}/task", timeout=2) as _response:
-            for _container in json.load(_response).get("Containers", []):
-                for _network in _container.get("Networks", []):
-                    ALLOWED_HOSTS.extend(_network.get("IPv4Addresses", []))
-    except (OSError, ValueError):
-        pass
 
 
 INSTALLED_APPS = [
@@ -114,7 +99,7 @@ DATABASES = {
         "ENGINE": "django.db.backends.postgresql",
         "NAME": config("DB_NAME", default="student_management"),
         "USER": config("DB_USER", default="postgres"),
-        "PASSWORD": config("DB_PASSWORD", default="abc.123"),
+        "PASSWORD": config("DB_PASSWORD"),
         "HOST": config("DB_HOST", default="localhost"),
         "PORT": config("DB_PORT", default="5432"),
     }
