@@ -6,3 +6,10 @@ __pycache__/
 db.sqlite3
 .git/
 rag_audit.html
+.github/
+db_backups/
+*.sql
+README.md
+docker-compose*.yml
+deploy/
+.env.*
