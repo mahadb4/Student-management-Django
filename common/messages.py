@@ -78,7 +78,7 @@ class Messages:
 
     # ── Validation — General ──────────────────────────────────────────────────
     INVALID_JSON = "Invalid JSON."
-    METHOD_NOT_ALLOWED = "Method not allowed."
+    METHOD_NOT_ALLOWED = "Method not allowed. (deployment test)"
     INVALID_REQUEST = "Invalid request."
     REQUEST_BODY_MUST_BE_JSON_OBJECT = "Request body must be a JSON object."
     REQUEST_DATA_MUST_BE_JSON_OBJECT = "Request data must be a JSON object."
