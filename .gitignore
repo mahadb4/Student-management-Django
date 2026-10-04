@@ -22,3 +22,5 @@ rag_audit.html
 .idea/
 .DS_Store
 Thumbs.db
+
+staticfiles/
